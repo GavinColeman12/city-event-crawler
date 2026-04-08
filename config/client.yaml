@@ -1,0 +1,82 @@
+client:
+  id: "horizon"
+  name: "Horizon Technologies"
+  hr_email: "hr@horizontech.com"
+  hr_phone: "extension 200"
+
+theme:
+  primary_color: "#1B6B4A"
+  accent_color: "#2ECC71"
+  logo: null
+
+chat:
+  greeting: |
+    Hi! I'm Horizon's HR assistant. I can answer questions about our policies, benefits, PTO, remote work, and more.
+
+    Everything you ask is confidential. How can I help?
+
+  placeholder: "Ask about PTO, benefits, expenses, remote work..."
+
+  suggested_questions:
+    - "How much PTO do I get after 2 years?"
+    - "What health insurance plans are available?"
+    - "Can I work remotely from another country?"
+    - "What's the 401k match?"
+    - "How do I submit an expense report?"
+    - "What's the dress code?"
+    - "How does the performance review process work?"
+    - "What's the parental leave policy?"
+
+  system_prompt: |
+    You are Horizon Technologies' HR Policy Assistant. You answer employee questions about company policies, benefits, leave, and workplace guidelines based on the official company documents in your knowledge base.
+
+    Rules:
+    - Answer ONLY based on the provided policy documents. Never make up policies or benefits.
+    - Cite the specific policy document and section when possible, e.g. [Source: PTO & Leave Policy, "PTO Accrual" section]
+    - If the answer is not in the documents, say: "I don't have that information in our current policy documents. Please contact HR directly at hr@horizontech.com or extension 200 for help with this question."
+    - For sensitive topics (termination, discrimination complaints, legal questions, medical accommodations), provide the factual policy information but ALWAYS add: "For your specific situation, I'd recommend speaking with HR directly at hr@horizontech.com — they can provide confidential, personalized guidance."
+    - Be warm, helpful, and professional — employees may be stressed or confused when asking these questions
+    - If a question is ambiguous, ask a clarifying question rather than guessing
+    - Use simple, clear language — avoid HR jargon
+    - When quoting specific numbers (PTO days, insurance premiums, stipend amounts), be precise and cite the source
+    - Never give legal advice — refer to HR or legal counsel for legal questions
+
+  sensitive_topics:
+    - "termination"
+    - "fired"
+    - "let go"
+    - "laid off"
+    - "discrimination"
+    - "harassment"
+    - "complaint"
+    - "lawsuit"
+    - "lawyer"
+    - "legal"
+    - "disability accommodation"
+    - "FMLA"
+    - "medical leave"
+    - "pregnancy"
+    - "mental health"
+    - "substance abuse"
+    - "disciplinary"
+    - "PIP"
+    - "performance improvement"
+    - "whistleblower"
+    - "retaliation"
+
+  retrieval:
+    top_k: 5
+    similarity_threshold: 0.3
+
+  model: "claude-sonnet-4-20250514"
+  max_tokens: 800
+
+analytics:
+  enabled: true
+  log_queries: true
+  log_responses: false
+  anonymous_mode: true
+
+auth:
+  admin_password: "hr-admin-2026"
+  chat_password: null
