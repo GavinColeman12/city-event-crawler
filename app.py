@@ -1,7 +1,25 @@
 import streamlit as st
+from pathlib import Path
 from src.config import load_config
+from src.vectorstore import get_collection
 
 config = load_config()
+
+# Auto-ingest sample data if vector store is empty (first run / cloud deploy)
+client_id = config.get("client", {}).get("id")
+collection = get_collection(client_id)
+if collection.count() == 0:
+    from src.parsers import parse_file, SUPPORTED_EXTENSIONS
+    from src.chunker import chunk_documents
+    from src.vectorstore import add_chunks
+
+    sample_dir = Path(__file__).parent / "sample_data"
+    if sample_dir.exists():
+        for f in sorted(sample_dir.iterdir()):
+            if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:
+                docs = parse_file(str(f.resolve()))
+                chunks = chunk_documents(docs)
+                add_chunks(chunks, client_id)
 
 st.set_page_config(
     page_title=f"{config['client']['name']} — HR Assistant",
