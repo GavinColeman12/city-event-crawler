@@ -1,7 +1,7 @@
 import os
 import time
 
-from anthropic import Anthropic
+from anthropic import Anthropic, APIStatusError
 from dotenv import load_dotenv
 
 from .config import get_config
@@ -81,14 +81,27 @@ def generate_response(query: str, conversation_history: list = None, config: dic
     max_tokens = config.get("chat", {}).get("max_tokens", 800)
 
     client = _get_client()
-    response = client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        system=system_prompt,
-        messages=messages,
-    )
 
-    answer = response.content[0].text
+    # Retry up to 3 times on overloaded/transient errors
+    answer = None
+    for attempt in range(3):
+        try:
+            response = client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                system=system_prompt,
+                messages=messages,
+            )
+            answer = response.content[0].text
+            break
+        except APIStatusError as e:
+            if e.status_code in (429, 529, 503) and attempt < 2:
+                time.sleep(2 ** attempt)  # 1s, 2s backoff
+                continue
+            raise
+
+    if answer is None:
+        answer = "I'm experiencing high demand right now. Please try again in a moment."
 
     # Append escalation message for sensitive topics
     if sensitive:
