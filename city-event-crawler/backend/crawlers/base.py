@@ -159,11 +159,12 @@ class BaseCrawler(abc.ABC):
 
     @property
     def client(self) -> httpx.AsyncClient:
-        """Return the active HTTP client, raising if the context manager was not used."""
+        """Return the active HTTP client, creating one if needed."""
         if self._client is None:
-            raise RuntimeError(
-                f"{self.name} crawler must be used as an async context manager "
-                "(async with crawler: ...)"
+            self._client = httpx.AsyncClient(
+                headers=DEFAULT_HEADERS,
+                timeout=httpx.Timeout(DEFAULT_TIMEOUT),
+                follow_redirects=True,
             )
         return self._client
 
