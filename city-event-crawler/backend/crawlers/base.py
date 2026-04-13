@@ -309,6 +309,7 @@ class BaseCrawler(abc.ABC):
         self,
         url: str,
         *,
+        params: dict[str, Any] | None = None,
         json: Any | None = None,
         data: Any | None = None,
         headers: dict[str, str] | None = None,
@@ -317,7 +318,7 @@ class BaseCrawler(abc.ABC):
         await self._rate_limit()
         try:
             response = await self.client.post(
-                url, json=json, data=data, headers=headers,
+                url, params=params, json=json, data=data, headers=headers,
             )
             response.raise_for_status()
             return response

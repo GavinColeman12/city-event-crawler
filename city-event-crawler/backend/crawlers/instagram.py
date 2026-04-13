@@ -22,10 +22,8 @@ from .base import BaseCrawler
 
 logger = logging.getLogger(__name__)
 
-# Apify actor IDs
-PROFILE_SCRAPER = "apify~instagram-profile-scraper"
-HASHTAG_SCRAPER = "apify~instagram-hashtag-scraper"
-POST_SCRAPER = "apify~instagram-post-scraper"
+# Apify actor - the main instagram-scraper handles profiles, hashtags, and posts
+INSTAGRAM_SCRAPER = "apify~instagram-scraper"
 
 CITY_HASHTAGS = {
     "budapest": ["budapestevents", "budapestnightlife", "budapestparty", "budapesttonight"],
@@ -94,22 +92,23 @@ class InstagramCrawler(BaseCrawler):
         return accounts[:50]  # Cap at 50 accounts per search
 
     async def _scrape_profiles(self, accounts, city, date, token, seen):
-        """Use Apify Instagram Profile Scraper to get recent posts from accounts."""
-        # Batch accounts into groups to avoid overloading
-        batch_size = 15
+        """Use Apify instagram-scraper to get recent posts from discovered accounts."""
+        # Batch accounts to stay within free tier limits
+        batch_size = 10
         all_posts = []
 
-        for i in range(0, len(accounts), batch_size):
+        for i in range(0, min(len(accounts), 30), batch_size):  # Cap at 30 accounts
             batch = accounts[i:i + batch_size]
-            usernames = [f"https://www.instagram.com/{a}/" for a in batch]
+            urls = [f"https://www.instagram.com/{a}/" for a in batch]
 
             resp = await self._post(
-                f"https://api.apify.com/v2/acts/{PROFILE_SCRAPER}/run-sync-get-dataset-items",
+                f"https://api.apify.com/v2/acts/{INSTAGRAM_SCRAPER}/run-sync-get-dataset-items",
                 params={"token": token},
                 json={
-                    "usernames": usernames,
+                    "directUrls": urls,
                     "resultsLimit": 5,  # Last 5 posts per account
                     "resultsType": "posts",
+                    "searchType": "user",
                 },
             )
             if not resp:
@@ -127,11 +126,12 @@ class InstagramCrawler(BaseCrawler):
         # Parse posts for events
         results = []
         for post in all_posts:
+          try:
             caption = post.get("caption", "") or ""
             if not self._looks_like_event(caption):
                 continue
 
-            shortcode = post.get("shortCode", post.get("id", ""))
+            shortcode = post.get("shortCode", post.get("shortcode", post.get("id", "")))
             eid = generate_event_id(self.source.value, shortcode)
             if eid in seen:
                 continue
@@ -139,11 +139,22 @@ class InstagramCrawler(BaseCrawler):
 
             event_title = self._extract_title(caption)
             event_date = self._extract_date(caption, date)
-            location = (
-                post.get("locationName")
-                or (post.get("location", {}).get("name") if isinstance(post.get("location"), dict) else None)
-            )
+            location = post.get("locationName") or post.get("location", "")
+            if isinstance(location, dict):
+                location = location.get("name", "")
             owner = post.get("ownerUsername", "")
+            if not owner and isinstance(post.get("owner"), dict):
+                owner = post["owner"].get("username", "")
+            def _safe_count(val):
+                if val is None:
+                    return None
+                try:
+                    n = int(val)
+                    return n if n >= 0 else None
+                except (ValueError, TypeError):
+                    return None
+            likes = _safe_count(post.get("likesCount")) or _safe_count(post.get("likes"))
+            comments = _safe_count(post.get("commentsCount")) or _safe_count(post.get("comments"))
 
             results.append(Event(
                 id=eid,
@@ -152,10 +163,10 @@ class InstagramCrawler(BaseCrawler):
                 date=event_date or parse_date(date),
                 source=self.source,
                 source_url=f"https://www.instagram.com/p/{shortcode}/" if shortcode else f"https://www.instagram.com/{owner}/",
-                venue_name=location,
-                image_url=post.get("displayUrl") or post.get("imageUrl"),
-                likes=post.get("likesCount", 0),
-                comments=post.get("commentsCount", 0),
+                venue_name=location if location else None,
+                image_url=post.get("displayUrl") or post.get("imageUrl") or post.get("url"),
+                likes=likes,
+                comments=comments,
                 vibes=self.classify_vibes(event_title, caption),
                 tags=[f"@{owner}"] if owner else [],
                 organizer=f"@{owner}" if owner else None,
@@ -166,18 +177,23 @@ class InstagramCrawler(BaseCrawler):
                     "type": "profile_scrape",
                 },
             ))
+          except Exception as exc:
+            self._log_warning("Failed to parse Instagram post: %s", exc)
+            continue
 
         return results
 
     async def _search_hashtags(self, hashtags, city, date, token, seen):
         """Use Apify Instagram Hashtag Scraper for supplementary discovery."""
+        tag_urls = [f"https://www.instagram.com/explore/tags/{tag}/" for tag in hashtags]
         resp = await self._post(
-            f"https://api.apify.com/v2/acts/{HASHTAG_SCRAPER}/run-sync-get-dataset-items",
+            f"https://api.apify.com/v2/acts/{INSTAGRAM_SCRAPER}/run-sync-get-dataset-items",
             params={"token": token},
             json={
-                "hashtags": hashtags,
+                "directUrls": tag_urls,
                 "resultsLimit": 20,
                 "resultsType": "posts",
+                "searchType": "hashtag",
             },
         )
         if not resp:
@@ -193,6 +209,7 @@ class InstagramCrawler(BaseCrawler):
 
         results = []
         for post in posts:
+          try:
             caption = post.get("caption", "") or ""
             if not self._looks_like_event(caption):
                 continue
@@ -204,11 +221,17 @@ class InstagramCrawler(BaseCrawler):
             seen.add(eid)
 
             event_title = self._extract_title(caption)
-            location = (
-                post.get("locationName")
-                or (post.get("location", {}).get("name") if isinstance(post.get("location"), dict) else None)
-            )
+            location = post.get("locationName") or ""
+            if isinstance(post.get("location"), dict):
+                location = post["location"].get("name", "")
             owner = post.get("ownerUsername", "")
+
+            def _safe(val):
+                try:
+                    n = int(val) if val is not None else None
+                    return n if n is not None and n >= 0 else None
+                except (ValueError, TypeError):
+                    return None
 
             results.append(Event(
                 id=eid,
@@ -217,15 +240,18 @@ class InstagramCrawler(BaseCrawler):
                 date=self._extract_date(caption, date) or parse_date(date),
                 source=self.source,
                 source_url=f"https://www.instagram.com/p/{shortcode}/" if shortcode else "https://www.instagram.com",
-                venue_name=location,
+                venue_name=location if location else None,
                 image_url=post.get("displayUrl") or post.get("imageUrl"),
-                likes=post.get("likesCount", 0),
-                comments=post.get("commentsCount", 0),
+                likes=_safe(post.get("likesCount")),
+                comments=_safe(post.get("commentsCount")),
                 vibes=self.classify_vibes(event_title, caption),
                 tags=[f"@{owner}"] if owner else [],
                 organizer=f"@{owner}" if owner else None,
                 raw_data={"shortcode": shortcode, "type": "hashtag_scrape"},
             ))
+          except Exception as exc:
+            self._log_warning("Failed to parse hashtag post: %s", exc)
+            continue
 
         return results
 
