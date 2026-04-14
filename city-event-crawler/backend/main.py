@@ -16,6 +16,7 @@ import asyncio
 import logging
 import time
 import traceback
+from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -282,14 +283,20 @@ async def search_events(request: SearchRequest) -> SearchResponse:
             if not ev.vibes or set(ev.vibes) & requested_vibes
         ]
 
-    # 8. Deduplicate
-    filtered_events = deduplicate_events(filtered_events)
+    # 8. Deduplicate (wrap in try/except to never fail on bad data)
+    try:
+        filtered_events = deduplicate_events(filtered_events)
+    except Exception as exc:
+        logger.error("Deduplication failed: %s - returning unfiltered", exc)
 
     # 9. Sort by engagement score (descending), then by date
-    filtered_events.sort(
-        key=lambda ev: (ev.engagement_score, ev.date),
-        reverse=True,
-    )
+    try:
+        filtered_events.sort(
+            key=lambda ev: (ev.engagement_score or 0, ev.date or datetime.min),
+            reverse=True,
+        )
+    except Exception as exc:
+        logger.warning("Sort failed: %s", exc)
 
     # 10. Truncate to max_results
     filtered_events = filtered_events[: request.max_results]

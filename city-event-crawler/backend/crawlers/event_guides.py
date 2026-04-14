@@ -24,22 +24,80 @@ class EventGuidesCrawler(BaseCrawler):
     source = EventSource.GUIDES
     name = "Event Guides"
 
-    # Guide sites we target via site: searches
+    # Comprehensive free event guide sites
     TARGET_SITES = [
+        # Music & concerts
         ("songkick.com", ["MUSIC"]),
         ("bandsintown.com", ["MUSIC"]),
-        ("goout.net", ["MUSIC", "NIGHTLIFE", "ART_CULTURE"]),
+        ("setlist.fm", ["MUSIC"]),
+        ("jambase.com", ["MUSIC"]),
+        ("concertful.com", ["MUSIC"]),
+        ("beatport.com", ["MUSIC", "NIGHTLIFE"]),
+        ("mixmag.net", ["MUSIC", "NIGHTLIFE"]),
+
+        # Nightlife & clubs
         ("xceed.me", ["NIGHTLIFE", "MUSIC"]),
-        ("timeout.com", ["SOCIAL", "ART_CULTURE"]),
+        ("clubberia.com", ["NIGHTLIFE", "MUSIC"]),
+
+        # Festivals
+        ("festicket.com", ["FESTIVAL", "MUSIC"]),
+        ("festivalinsights.com", ["FESTIVAL"]),
+
+        # General event aggregators
+        ("allevents.in", ["SOCIAL"]),
+        ("evensi.com", ["SOCIAL"]),
+        ("10times.com", ["NETWORKING", "SOCIAL"]),
+        ("eventful.com", ["SOCIAL"]),
+
+        # Local event guides (TimeOut network)
+        ("timeout.com", ["SOCIAL", "ART_CULTURE", "FOOD_DRINK"]),
+
+        # Tourism / city sites
         ("visitlondon.com", ["ART_CULTURE"]),
         ("visitberlin.de", ["SOCIAL"]),
         ("visitlisboa.com", ["SOCIAL"]),
         ("iamsterdam.com", ["SOCIAL"]),
+        ("visitcopenhagen.com", ["SOCIAL"]),
+        ("visitdublin.com", ["SOCIAL"]),
+        ("visitoslo.com", ["SOCIAL"]),
+        ("myhelsinki.fi", ["SOCIAL"]),
+        ("visitstockholm.com", ["SOCIAL"]),
+        ("visit.brussels", ["SOCIAL"]),
+        ("turismoroma.it", ["ART_CULTURE"]),
+
+        # Local city blogs
         ("expats.cz", ["SOCIAL"]),
         ("welovebudapest.com", ["SOCIAL", "ART_CULTURE"]),
         ("funzine.hu", ["SOCIAL"]),
         ("exberliner.com", ["ART_CULTURE"]),
-        ("timeout.com/meetup", ["SOCIAL", "NETWORKING"]),
+        ("goout.net", ["MUSIC", "NIGHTLIFE", "ART_CULTURE"]),
+        ("lovekrakow.pl", ["SOCIAL"]),
+        ("belgradenight.com", ["NIGHTLIFE"]),
+        ("thisisathens.org", ["SOCIAL"]),
+        ("falter.at", ["ART_CULTURE", "SOCIAL"]),
+
+        # Food & drink
+        ("eater.com", ["FOOD_DRINK"]),
+        ("infatuation.com", ["FOOD_DRINK"]),
+
+        # LGBTQ+
+        ("queerty.com", ["LGBTQ"]),
+        ("them.us", ["LGBTQ"]),
+
+        # Wellness
+        ("mindbodyonline.com", ["WELLNESS"]),
+        ("classpass.com", ["WELLNESS", "SPORT_FITNESS"]),
+
+        # Kinky / Alternative
+        ("skirtclub.com", ["KINKY", "DATING", "LGBTQ"]),
+        ("kinkyevents.com", ["KINKY"]),
+
+        # Dating / Singles
+        ("thesinglesevents.com", ["DATING"]),
+
+        # Tech / Networking
+        ("eventil.com", ["NETWORKING"]),
+        ("techmeme.com/events", ["NETWORKING"]),
     ]
 
     async def crawl(self, city, date, lat, lon, radius_km, vibes=None, **kw):
@@ -51,9 +109,29 @@ class EventGuidesCrawler(BaseCrawler):
         events = []
         seen = set()
 
-        for site, default_vibes in self.TARGET_SITES:
-            results = await self._search_site(site, city, date, default_vibes, settings.SERPAPI_KEY, seen)
-            events.extend(results)
+        # Filter sites by requested vibes to conserve API calls
+        target_sites = self.TARGET_SITES
+        if vibes:
+            requested = {(v.value if hasattr(v, 'value') else str(v)).upper() for v in vibes}
+            target_sites = [
+                (site, defaults) for site, defaults in self.TARGET_SITES
+                if any(d in requested for d in defaults) or not defaults
+            ]
+            # Always include top general sites
+            general_sites = {"songkick.com", "timeout.com", "allevents.in", "xceed.me"}
+            for s, d in self.TARGET_SITES:
+                if s in general_sites and (s, d) not in target_sites:
+                    target_sites.append((s, d))
+
+        self._log_info("Searching %d event guide sites for %s", len(target_sites), city)
+
+        for site, default_vibes in target_sites:
+            try:
+                results = await self._search_site(site, city, date, default_vibes, settings.SERPAPI_KEY, seen)
+                events.extend(results)
+            except Exception as e:
+                self._log_warning("Site %s failed: %s", site, e)
+                continue
 
         self._log_info("Found %d events from event guides for %s", len(events), city)
         return self._filter_by_vibes(events, vibes)
