@@ -36,8 +36,10 @@ def _pool() -> ConnectionPool:
         st.stop()
     pool = ConnectionPool(
         conninfo=url,
-        min_size=1,
+        min_size=0,                # don't hold idle connections open against Neon
         max_size=4,
+        max_idle=30.0,             # close idle connections after 30s
+        max_lifetime=240.0,        # recycle connections every ~4 min (under Neon's idle suspend)
         kwargs={"autocommit": True},
         # Health check: pool runs `SELECT 1` and replaces the connection
         # if it's dead. Cheap insurance against Neon idle drops.
