@@ -1,61 +1,113 @@
-# City Event Crawler
+# City Event Crawler v2
 
-Discover fun events across European cities by vibe, ranked by popularity. Multi-agent pipeline that aggregates events from 13+ sources (Google, Instagram, Resident Advisor, Dice.fm, Meetup, FetLife, Event Guides, and more).
+Instagram-only deep discovery for European cities, with Claude-powered curation. Output isn't a flat list of events — it's an evening guide: a top pick, a 3–5 step itinerary, hidden gems, and a skip list, all curated for a 20–30 year old audience.
 
-## What it does
-
-Pick a city and date, and the crawler finds events from:
-
-- **Google Events** - via SearchAPI.io
-- **Instagram** - auto-discovers club/promoter accounts via Google, scrapes posts via Apify
-- **Resident Advisor** - techno/house/electronic music events
-- **Dice.fm** - live music and club nights
-- **Meetup** - social groups, expat communities, language exchanges
-- **FetLife** - public kink/fetish events (munches, play parties, workshops)
-- **Event Guides** - Songkick, Bandsintown, TimeOut, AllEvents, Xceed, Festicket, Skirt Club, Them.us, Eater, ClassPass, GoOut, and more
-- **Blog Scraper** - local event listing sites (WeLoveBudapest, ExBerliner, etc.)
-
-Plus optional sources with their own API keys:
-- Eventbrite, Ticketmaster, Reddit, X/Twitter, Facebook
-
-## Multi-agent architecture
+## Pipeline
 
 ```
-Researcher -> Crawler -> Classifier -> Quality -> Ranker
+DISCOVER  →  TRIAGE  →  SCRAPE  →  EXTRACT  →  SCORE  →  CURATE
+   │           │          │          │          │         │
+SerpAPI     Claude     Apify       Claude     Claude    Claude
++ seeds     filters    pulls IG    parses     rates     writes
++ city      bad-fit    posts/      captions   each      EveningGuide
+hashtags    accounts   reels       → Events   event     (top pick,
+                                              on 4      itinerary,
+                                              axes      gems, skips)
 ```
 
-1. **Researcher Agent** - Auto-discovers city-specific sources (Instagram accounts, subreddits, local sites)
-2. **Crawler Agent** - Dispatches all platform crawlers in parallel
-3. **Classifier Agent** - Categorizes events by vibe using keyword + venue + source signals
-4. **Quality Agent** - Deduplicates across platforms, validates data
-5. **Ranker Agent** - Sorts by engagement-weighted popularity score
+| Stage    | What it does                                                              |
+|----------|---------------------------------------------------------------------------|
+| DISCOVER | Find candidate Instagram accounts via SerpAPI Google + curated city seeds |
+| TRIAGE   | Claude prunes the list to ~25 accounts that fit the city + requested vibes |
+| SCRAPE   | Apify `apify~instagram-scraper` pulls recent posts from each account       |
+| EXTRACT  | Claude parses captions into structured `Event` records (title, date, venue, vibes) |
+| SCORE    | Claude rates each event on quality, popularity, fun factor, demographic fit |
+| CURATE   | Claude writes the `EveningGuide` and tags each event with a `curation_tier` |
 
-## 15 vibe categories
+Each event ends up labelled `top_pick`, `hidden_gem`, `standard`, or `skip`, and the response includes a single `EveningGuide` payload with a Claude-written summary, a numbered itinerary, hidden gems, and skip list.
 
-Social, Dating, Kinky, Nightlife, Music, Art & Culture, Food & Drink, Wellness, Adventure, Networking, LGBTQ+, Underground, Festival, Sport & Fitness, Other
+## API
 
-## 45+ European cities
+```
+POST /api/search
+GET  /api/cities
+GET  /api/vibes
+GET  /api/health
+```
 
-Budapest, Berlin, Prague, Barcelona, Amsterdam, Lisbon, Vienna, Warsaw, Krakow, Belgrade, London, Paris, Rome, Milan, Athens, Dublin, Copenhagen, Stockholm, Oslo, Helsinki, Madrid, Munich, Istanbul, and more.
+`POST /api/search` body:
 
-## Running it
+```json
+{
+  "city": "Berlin",
+  "date": "2026-04-26",
+  "vibes": ["nightlife", "underground"],
+  "radius_km": 15,
+  "max_results": 60
+}
+```
 
-### Prerequisites
+Response highlights:
 
-- Python 3.10+
-- Node 18+
-- [SearchAPI.io key](https://www.searchapi.io/) (required - $20/mo for 10k searches)
-- [Apify token](https://apify.com/) (optional but recommended for Instagram - $5 free credits)
+```json
+{
+  "events": [
+    {
+      "id": "instagram_…",
+      "title": "Sub:Stance × Cellbrain",
+      "date": "2026-04-26T23:00:00",
+      "venue_name": "Sisyphos Berlin",
+      "account_handle": "sisyphos_berlin",
+      "scrape_source": "profile",
+      "vibes": ["nightlife", "underground"],
+      "curation_tier": "top_pick",
+      "score_breakdown": {
+        "quality": 0.82, "popularity": 0.74,
+        "fun_factor": 0.91, "demographic_fit": 0.88
+      },
+      "suggested_itinerary_position": 0,
+      "image_url": "…",
+      "source_url": "https://www.instagram.com/p/…/"
+    }
+  ],
+  "curated_guide": {
+    "summary_text": "Tonight Berlin leans deep…",
+    "demographic_note": "Best for techno-curious 20-somethings who don't sleep early",
+    "top_pick_id": "instagram_…",
+    "itinerary_ids": ["…", "…", "…"],
+    "hidden_gem_ids": ["…", "…"],
+    "skip_ids": []
+  },
+  "accounts_discovered": 73,
+  "accounts_triaged": 24,
+  "posts_scraped": 168,
+  "events_extracted": 31,
+  "search_duration_seconds": 47.21
+}
+```
+
+## Setup
+
+Three API keys are required:
+
+| Key                      | Where to get it                | Notes                                          |
+|--------------------------|--------------------------------|------------------------------------------------|
+| `SERPAPI_KEY`            | https://www.searchapi.io/      | Used for Instagram account discovery           |
+| `INSTAGRAM_APIFY_TOKEN`  | https://apify.com/             | Pays for `apify~instagram-scraper` actor runs  |
+| `ANTHROPIC_API_KEY`      | https://console.anthropic.com/ | Powers TRIAGE / EXTRACT / SCORE / CURATE       |
+
+```bash
+cp .env.example .env
+# fill in the three keys
+```
 
 ### Backend
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r backend/requirements.txt
-cp .env.example .env
-# Edit .env with your API keys
-python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
 ```
 
 ### Frontend
@@ -63,78 +115,113 @@ python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev   # http://localhost:3000
 ```
-
-Open http://localhost:3000
 
 ### Docker
 
 ```bash
-docker compose up --build
+docker-compose up --build
 ```
-
-## API keys
-
-All keys go in `.env` (copy from `.env.example`):
-
-| Key | Cost | Notes |
-|-----|------|-------|
-| `SERPAPI_KEY` | $20/mo | SearchAPI.io (powers 8 of the 13 crawlers) |
-| `INSTAGRAM_APIFY_TOKEN` | $5 free / $49/mo | Apify Instagram scraping |
-| `EVENTBRITE_TOKEN` | Free | Optional |
-| `TICKETMASTER_API_KEY` | Free | Optional |
-| `REDDIT_CLIENT_ID` + `SECRET` | Free | Optional |
-| `TWITTER_BEARER_TOKEN` | $100/mo | Optional |
-| `FACEBOOK_ACCESS_TOKEN` | Free (needs review) | Optional |
-
-The blog scraper, RA GraphQL API, and SearchAPI-powered crawlers all work without any additional keys once SearchAPI is configured.
 
 ## Project structure
 
 ```
-.
-├── backend/
-│   ├── main.py                # FastAPI app + /api/search endpoint
-│   ├── config.py              # Settings + city coordinates
-│   ├── models.py              # Event, SearchRequest, SearchResponse
-│   ├── agents/                # Multi-agent orchestration
-│   │   ├── researcher.py      # Discovers accounts/venues per city
-│   │   ├── crawler_agent.py   # Parallel crawler dispatcher
-│   │   ├── classifier_agent.py
-│   │   ├── quality_agent.py
-│   │   ├── ranker_agent.py
-│   │   └── orchestrator.py
-│   ├── crawlers/              # Platform-specific crawlers
-│   │   ├── google_events.py
-│   │   ├── instagram.py
-│   │   ├── resident_advisor.py
-│   │   ├── dice.py
-│   │   ├── meetup.py
-│   │   ├── fetlife.py
-│   │   ├── event_guides.py    # Songkick, TimeOut, AllEvents, etc.
-│   │   ├── blog_scraper.py
-│   │   ├── eventbrite.py
-│   │   ├── ticketmaster.py
-│   │   ├── reddit.py
-│   │   ├── twitter.py
-│   │   └── facebook.py
-│   └── services/              # Aggregation, geocoding, classification
-├── frontend/                  # React + Vite + Leaflet
-│   └── src/
-│       ├── App.jsx
-│       └── components/        # SearchBar, EventCard, FilterPanel, MapView
-├── docker-compose.yml
-└── .env.example
+backend/
+  main.py              # FastAPI app + /api/search pipeline
+  models.py            # Event, EveningGuide, SearchRequest/Response
+  config.py            # 3 API keys + Claude model settings
+  instagram/
+    discover.py        # SerpAPI + curated city seeds → IG handles
+    triage.py          # Claude filters bad-fit accounts
+    scraper.py         # Apify pulls posts/reels
+  extraction/
+    extract.py         # Claude parses captions → Event
+    score.py           # Claude rates each event on 4 axes
+    curate.py          # Claude composes the EveningGuide
+  utils/
+    helpers.py         # haversine distance
+
+frontend/
+  src/
+    App.jsx
+    App.css            # includes curation badge / score bar / evening guide styles
+    components/
+      EveningGuide.jsx # hero panel rendering top pick + itinerary + gems + skips
+      EventCard.jsx    # curation badges + score breakdown bars
+      FilterPanel.jsx  # vibe chips + curation tier dropdown
+      EventList.jsx, MapView.jsx, SearchBar.jsx, StatsBar.jsx
 ```
 
-## API endpoints
+## Postgres caching + cost log
 
-- `POST /api/search` - search events (body: `{city, date, vibes?, platforms?, radius_km?}`)
-- `GET /api/cities` - list supported cities
-- `GET /api/vibes` - list vibe categories
-- `GET /api/sources` - list event sources
-- `GET /api/health` - health check
+Set `DATABASE_URL` in `.env` to a Postgres URI (Neon works out of the box, including the `?sslmode=require&channel_binding=require` suffix). Initialise the schema once:
+
+```bash
+backend/.venv/bin/python -c "
+import asyncio, asyncpg
+from dotenv import dotenv_values
+async def main():
+    conn = await asyncpg.connect(dotenv_values('.env')['DATABASE_URL'])
+    await conn.execute(open('backend/db/init.sql').read())
+asyncio.run(main())
+"
+```
+
+Two tables get created:
+- `scrape_cache` — raw Apify items per `(account_handle, content_type)` pair, 24h TTL.
+- `cost_log` — one row per `/api/search` run, used for the monthly budget cutoff and the Streamlit dashboard.
+
+The pipeline degrades gracefully if `DATABASE_URL` is unset — caching becomes a no-op and runs aren't logged.
+
+## Streamlit admin dashboard
+
+`streamlit_app/` is an internal dashboard over the same Postgres. Four tabs:
+
+- **Search** — fires `/api/search` against the FastAPI backend (`BACKEND_URL`)
+- **Runs** — paginated `cost_log` browser
+- **Cost** — month-to-date spend, daily chart, runway, cache hit rate
+- **Cache** — browse + purge `scrape_cache`
+
+Local:
+```bash
+python3 -m venv streamlit_app/.venv
+streamlit_app/.venv/bin/pip install -r streamlit_app/requirements.txt
+streamlit_app/.venv/bin/streamlit run streamlit_app/app.py
+```
+
+Deploy to **Streamlit Community Cloud** (free):
+1. Push the repo to GitHub.
+2. At [share.streamlit.io](https://share.streamlit.io) → New app → point at `streamlit_app/app.py`.
+3. In Streamlit Cloud secrets, add:
+   ```toml
+   DATABASE_URL = "postgresql://..."
+   BACKEND_URL  = "https://your-fastapi-host"   # optional; Search tab requires it
+   ```
+4. Cost / Runs / Cache tabs work immediately. The Search tab needs a public FastAPI host.
+
+## Apify cost control
+
+Defaults in `backend/config.py` are tuned for the Apify Starter plan ($30/mo):
+
+| Setting                  | Default | Notes                                    |
+|--------------------------|---------|------------------------------------------|
+| `MAX_ACCOUNTS_PER_SEARCH`| 60      | After TRIAGE                             |
+| `MAX_POSTS_PER_ACCOUNT`  | 2       | wider, shallower                         |
+| `MAX_STORIES_PER_ACCOUNT`| 5       | most accounts have 0–3 active stories    |
+| `SCRAPE_INCLUDE_STORIES` | true    | stories often carry "tonight" announcements |
+| `SCRAPE_INCLUDE_HASHTAGS`| false   | extra cost, marginal value               |
+| `POSTS_CACHE_TTL_HOURS`  | 24      | per-account                              |
+| `STORIES_CACHE_TTL_HOURS`| 24      |                                          |
+| `MONTHLY_BUDGET_USD`     | 25.0    | cuts off SCRAPE; cache-only fallback     |
+| `APIFY_POSTS_USD_PER_1K` | 2.30    | check actor's pricing page               |
+| `APIFY_STORIES_USD_PER_1K`| 2.30   | check stories actor's pricing page       |
+
+At defaults, a fresh search bills ~300 results ≈ $0.69. With 24h cache, repeated city searches in the same day are free.
+
+## Tuning
+
+The demographic targeting (20–30 year olds) lives in the system prompts inside `extraction/score.py` and `extraction/curate.py` — edit those strings to retarget.
 
 ## License
 
