@@ -44,9 +44,16 @@ CITY_SEED_DATA: dict[str, dict[str, list[str]]] = {
     },
     "berlin": {
         "instagram_seeds": [
+            # Major club-night / open-air venues
             "berghain.official", "kitkatclub_berlin", "aboutblank.berlin",
             "sisyphos_berlin", "watergateclub", "wilderenate", "holzmarkt25",
             "renate_berlin", "tresorberlin", "salonzursommerfrische",
+            # Play-party scene (best-guess handles; TRIAGE will filter wrong ones).
+            # Note: the Berlin kink scene's central listings are on Fetlife
+            # (events tab) and private Telegram channels — those aren't IG and
+            # are out of this pipeline's scope.
+            "kinkyevents.berlin", "insomnia.berlin", "klubverboten",
+            "quaelgeist.berlin", "karadahouse",
         ],
     },
     "prague": {
@@ -377,13 +384,24 @@ async def discover_accounts(
         )
         return handles
 
+    # Map each EventVibe to natural-language search phrases.
+    # Multiple phrases per vibe so the query yields varied result pages.
+    _VIBE_QUERY_PHRASES = {
+        "open_air": ["open air party", "rooftop daytime party", "outdoor festival"],
+        "club_night": ["nightclub", "techno club night", "warehouse rave"],
+        "mingle": ["language exchange meetup", "expat mixer", "social meetup"],
+        "headliner": ["headline concert", "big DJ set", "festival headliner"],
+        "play_party": ["kink play party", "fetish night", "shibari workshop"],
+        "other": ["events"],
+    }
+
     # Build query list — generic + scene-specific + vibe-specific
     queries = [q.format(city=city_key) for q in ALL_QUERY_TEMPLATES]
     if vibes:
         for vibe in list(vibes)[:4]:
-            vibe_name = vibe.value if hasattr(vibe, "value") else str(vibe)
-            queries.append(f"{city_key} {vibe_name.replace('_', ' ')} events instagram")
-            queries.append(f"best {city_key} {vibe_name.replace('_', ' ')} instagram accounts")
+            vibe_value = vibe.value if hasattr(vibe, "value") else str(vibe)
+            for phrase in _VIBE_QUERY_PHRASES.get(vibe_value, [vibe_value.replace("_", " ")]):
+                queries.append(f"{city_key} {phrase} instagram")
     queries = queries[:max_queries]
 
     serpapi_sem = asyncio.Semaphore(parallel_serpapi)

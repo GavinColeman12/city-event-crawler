@@ -40,6 +40,16 @@ that someone could attend. If yes, extract:
 - start_time: HH:MM 24h, or null if not stated
 - venue_name: physical venue / location, or null
 - vibes: 1-3 from this exact list: """ + ", ".join(_VIBE_VALUES) + """
+  Definitions:
+    open_air    — daytime / outdoor / open-air DJ sets, rooftop sessions, park events
+    club_night  — late-night club nights (typically doors after 22:00, indoor)
+    mingle      — events where the goal is meeting people: mixers, language
+                  exchanges, expat meetups, singles events, social brunches
+    headliner   — big concerts or marquee DJ sets with a recognised headline act,
+                  festival mainstages, sold-out arena-scale shows
+    play_party  — kink scene events: play parties, fetish nights, munches,
+                  shibari workshops, kink-friendly social events
+    other       — anything that doesn't fit the above
 - is_event: true if it's a real upcoming attendable event, false otherwise
 - confidence: 0.0-1.0 — how sure are you this is a real event with the data above
 

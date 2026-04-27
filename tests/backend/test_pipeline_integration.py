@@ -43,7 +43,7 @@ def client():
 def test_live_berlin_search_returns_cost_and_events(client):
     resp = client.post(
         "/api/search",
-        json={"city": "berlin", "date": "2026-04-27", "vibes": ["nightlife"], "max_results": 10},
+        json={"city": "berlin", "date": "2026-04-27", "vibes": ["club_night"], "max_results": 10},
     )
     assert resp.status_code == 200
     data = resp.json()

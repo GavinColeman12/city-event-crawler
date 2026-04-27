@@ -3,18 +3,21 @@ import { MapPin, Clock, Heart, MessageCircle, ExternalLink, Sparkles, Gem } from
 import { format } from 'date-fns';
 
 const VIBE_LABELS = {
-  kinky: 'Kinky', dating: 'Dating', nightlife: 'Nightlife', social: 'Social',
-  music: 'Music', art_culture: 'Art & Culture', food_drink: 'Food & Drink',
-  wellness: 'Wellness', adventure: 'Adventure', networking: 'Networking',
-  lgbtq: 'LGBTQ+', underground: 'Underground', festival: 'Festival',
-  sport_fitness: 'Sport & Fitness', other: 'Other',
+  open_air: 'Open-air',
+  club_night: 'Club night',
+  mingle: 'Mingle',
+  headliner: 'Headliner',
+  play_party: 'Play party',
+  other: 'Other',
 };
 
 const VIBE_ICONS = {
-  kinky: '🔥', dating: '💕', nightlife: '🌙', social: '🤝',
-  music: '🎵', art_culture: '🎨', food_drink: '🍷', wellness: '🧘',
-  adventure: '🏔️', networking: '💼', lgbtq: '🌈', underground: '🕳️',
-  festival: '🎪', sport_fitness: '💪', other: '✨',
+  open_air: '☀️',
+  club_night: '🌙',
+  mingle: '🤝',
+  headliner: '🎤',
+  play_party: '🔥',
+  other: '✨',
 };
 
 const SCORE_LABELS = {

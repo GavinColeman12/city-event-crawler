@@ -21,21 +21,12 @@ from pydantic import BaseModel, Field, computed_field
 # ---------------------------------------------------------------------------
 
 class EventVibe(str, Enum):
-    SOCIAL = "social"
-    DATING = "dating"
-    KINKY = "kinky"
-    NIGHTLIFE = "nightlife"
-    MUSIC = "music"
-    ART_CULTURE = "art_culture"
-    FOOD_DRINK = "food_drink"
-    WELLNESS = "wellness"
-    ADVENTURE = "adventure"
-    NETWORKING = "networking"
-    LGBTQ = "lgbtq"
-    UNDERGROUND = "underground"
-    FESTIVAL = "festival"
-    SPORT_FITNESS = "sport_fitness"
-    OTHER = "other"
+    OPEN_AIR = "open_air"          # Daytime / outdoor DJ sets / rooftops, parks
+    CLUB_NIGHT = "club_night"      # Late-night club nights
+    MINGLE = "mingle"              # Meet-people social events, mixers
+    HEADLINER = "headliner"        # Big concerts / marquee DJ sets / festivals
+    PLAY_PARTY = "play_party"      # Kink scene events
+    OTHER = "other"                # Fallback
 
 
 class EventSource(str, Enum):

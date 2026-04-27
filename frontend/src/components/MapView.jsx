@@ -2,11 +2,12 @@ import React from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 
 const VIBE_LABELS = {
-  kinky: 'Kinky', dating: 'Dating', nightlife: 'Nightlife', social: 'Social',
-  music: 'Music', art_culture: 'Art & Culture', food_drink: 'Food & Drink',
-  wellness: 'Wellness', adventure: 'Adventure', networking: 'Networking',
-  lgbtq: 'LGBTQ+', underground: 'Underground', festival: 'Festival',
-  sport_fitness: 'Sport & Fitness',
+  open_air: 'Open-air',
+  club_night: 'Club night',
+  mingle: 'Mingle',
+  headliner: 'Headliner',
+  play_party: 'Play party',
+  other: 'Other',
 };
 
 export default function MapView({ events, center, userLocation }) {

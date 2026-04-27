@@ -13,7 +13,7 @@ async def test_record_run_inserts_one_row(pg_pool, clean_tables):
         {
             "city": "Berlin",
             "search_date": "2026-04-27",
-            "vibes": ["nightlife"],
+            "vibes": ["club_night"],
             "accounts_discovered": 158,
             "accounts_triaged": 60,
             "accounts_cache_hit": 12,

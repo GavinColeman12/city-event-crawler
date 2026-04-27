@@ -277,20 +277,12 @@ body {
 }
 
 /* Vibe color coding */
-.chip.active[data-vibe="kinky"]         { background: #dc2626; }
-.chip.active[data-vibe="dating"]        { background: #ec4899; }
-.chip.active[data-vibe="nightlife"]     { background: #7c3aed; }
-.chip.active[data-vibe="social"]        { background: #2563eb; }
-.chip.active[data-vibe="music"]         { background: #16a34a; }
-.chip.active[data-vibe="art_culture"]   { background: #d97706; }
-.chip.active[data-vibe="food_drink"]    { background: #ea580c; }
-.chip.active[data-vibe="wellness"]      { background: #0d9488; }
-.chip.active[data-vibe="adventure"]     { background: #65a30d; }
-.chip.active[data-vibe="networking"]    { background: #4f46e5; }
-.chip.active[data-vibe="lgbtq"]        { background: linear-gradient(135deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #8b5cf6); }
-.chip.active[data-vibe="underground"]   { background: #374151; }
-.chip.active[data-vibe="festival"]      { background: #c026d3; }
-.chip.active[data-vibe="sport_fitness"] { background: #0891b2; }
+.chip.active[data-vibe="open_air"]      { background: #f59e0b; }   /* sun amber */
+.chip.active[data-vibe="club_night"]    { background: #7c3aed; }   /* deep violet */
+.chip.active[data-vibe="mingle"]        { background: #16a34a; }   /* social green */
+.chip.active[data-vibe="headliner"]     { background: #c026d3; }   /* marquee magenta */
+.chip.active[data-vibe="play_party"]    { background: #dc2626; }   /* kink red */
+.chip.active[data-vibe="other"]         { background: #6b7280; }   /* neutral */
 
 /* Source chip colors (Instagram-only in v2) */
 .chip.active[data-source="instagram"]        { background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045); }
@@ -539,20 +531,12 @@ body {
   color: rgba(255, 255, 255, 0.15);
 }
 
-.event-card-image-placeholder.vibe-kinky         { background: linear-gradient(135deg, #1a0505 0%, #3b0a0a 100%); }
-.event-card-image-placeholder.vibe-dating        { background: linear-gradient(135deg, #1a0510 0%, #3b0a25 100%); }
-.event-card-image-placeholder.vibe-nightlife     { background: linear-gradient(135deg, #0d0520 0%, #1a0a3b 100%); }
-.event-card-image-placeholder.vibe-social        { background: linear-gradient(135deg, #050d1a 0%, #0a1a3b 100%); }
-.event-card-image-placeholder.vibe-music         { background: linear-gradient(135deg, #051a0a 0%, #0a3b15 100%); }
-.event-card-image-placeholder.vibe-art_culture   { background: linear-gradient(135deg, #1a1005 0%, #3b250a 100%); }
-.event-card-image-placeholder.vibe-food_drink    { background: linear-gradient(135deg, #1a0c05 0%, #3b1a0a 100%); }
-.event-card-image-placeholder.vibe-wellness      { background: linear-gradient(135deg, #051a18 0%, #0a3b35 100%); }
-.event-card-image-placeholder.vibe-adventure     { background: linear-gradient(135deg, #0d1a05 0%, #1a3b0a 100%); }
-.event-card-image-placeholder.vibe-networking    { background: linear-gradient(135deg, #0a0520 0%, #150a3b 100%); }
-.event-card-image-placeholder.vibe-lgbtq        { background: linear-gradient(135deg, #3b0a0a 0%, #0a0a3b 100%); }
-.event-card-image-placeholder.vibe-underground   { background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%); }
-.event-card-image-placeholder.vibe-festival      { background: linear-gradient(135deg, #1a051a 0%, #3b0a3b 100%); }
-.event-card-image-placeholder.vibe-sport_fitness { background: linear-gradient(135deg, #05151a 0%, #0a2b3b 100%); }
+.event-card-image-placeholder.vibe-open_air    { background: linear-gradient(135deg, #1a1005 0%, #3b250a 100%); }
+.event-card-image-placeholder.vibe-club_night  { background: linear-gradient(135deg, #0d0520 0%, #1a0a3b 100%); }
+.event-card-image-placeholder.vibe-mingle      { background: linear-gradient(135deg, #051a0a 0%, #0a3b15 100%); }
+.event-card-image-placeholder.vibe-headliner   { background: linear-gradient(135deg, #1a051a 0%, #3b0a3b 100%); }
+.event-card-image-placeholder.vibe-play_party  { background: linear-gradient(135deg, #1a0505 0%, #3b0a0a 100%); }
+.event-card-image-placeholder.vibe-other       { background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%); }
 
 .event-card-body {
   padding: 16px 20px 20px;
@@ -660,20 +644,12 @@ body {
   color: #fff;
 }
 
-.vibe-tag-kinky         { background: #dc2626; }
-.vibe-tag-dating        { background: #ec4899; }
-.vibe-tag-nightlife     { background: #7c3aed; }
-.vibe-tag-social        { background: #2563eb; }
-.vibe-tag-music         { background: #16a34a; }
-.vibe-tag-art_culture   { background: #d97706; }
-.vibe-tag-food_drink    { background: #ea580c; }
-.vibe-tag-wellness      { background: #0d9488; }
-.vibe-tag-adventure     { background: #65a30d; }
-.vibe-tag-networking    { background: #4f46e5; }
-.vibe-tag-lgbtq        { background: #8b5cf6; }
-.vibe-tag-underground   { background: #374151; }
-.vibe-tag-festival      { background: #c026d3; }
-.vibe-tag-sport_fitness { background: #0891b2; }
+.vibe-tag-open_air    { background: #f59e0b; }
+.vibe-tag-club_night  { background: #7c3aed; }
+.vibe-tag-mingle      { background: #16a34a; }
+.vibe-tag-headliner   { background: #c026d3; }
+.vibe-tag-play_party  { background: #dc2626; }
+.vibe-tag-other       { background: #6b7280; }
 
 /* Engagement metrics */
 .event-card-engagement {

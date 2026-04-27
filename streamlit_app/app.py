@@ -60,11 +60,8 @@ def _tab_search():
     max_results = col3.number_input("Max results", min_value=10, max_value=100, value=40)
     vibes = st.multiselect(
         "Vibes",
-        [
-            "nightlife", "underground", "music", "art_culture", "food_drink",
-            "lgbtq", "social", "kinky", "festival",
-        ],
-        default=["nightlife"],
+        ["open_air", "club_night", "mingle", "headliner", "play_party", "other"],
+        default=["club_night"],
     )
     st.caption(f"Backend: `{backend_url}`")
     if st.button("Run search", type="primary"):

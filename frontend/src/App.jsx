@@ -10,9 +10,7 @@ import StatsBar from './components/StatsBar';
 import { List, Map, AlertCircle } from 'lucide-react';
 
 const ALL_VIBES = [
-  'kinky', 'dating', 'nightlife', 'social', 'music', 'art_culture',
-  'food_drink', 'wellness', 'adventure', 'networking', 'lgbtq',
-  'underground', 'festival', 'sport_fitness',
+  'open_air', 'club_night', 'mingle', 'headliner', 'play_party', 'other',
 ];
 
 const TIER_RANK = { top_pick: 0, hidden_gem: 1, standard: 2, skip: 3 };
