@@ -1,39 +1,35 @@
 """
-City Event Crawler -- FastAPI application.
+City Event Crawler v2 — Instagram-only deep discovery + Claude curation.
 
-Central orchestrator that exposes REST endpoints for searching events
-across multiple platforms (Google, Eventbrite, Meetup, Instagram, Reddit,
-Twitter/X, Facebook, Resident Advisor, FetLife, Ticketmaster, Yelp, blogs).
-
-The main ``/api/search`` endpoint spins up all relevant crawlers in
-parallel (guarded by an asyncio.Semaphore), aggregates results, computes
-distances, deduplicates, and returns a sorted response.
+Pipeline:  DISCOVER → TRIAGE → SCRAPE → EXTRACT → SCORE → CURATE
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 import traceback
-from datetime import datetime
 from contextlib import asynccontextmanager
-from typing import Any
+from datetime import datetime
+from difflib import SequenceMatcher
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .config import CITY_COORDINATES, Settings, get_settings
-from .crawlers import get_all_crawlers
+from .config import CITY_COORDINATES, get_settings
+from .db import close_pool, get_pool
+from .db import cost as cost_db
+from .extraction import compose_guide, parse_events, rate_events
+from .extraction.score import composite_score
+from .instagram import discover_accounts, scrape_account_content, triage_accounts
 from .models import (
     CityInfo,
     Event,
-    EventSource,
     EventVibe,
     SearchRequest,
     SearchResponse,
 )
-from .utils.helpers import calculate_distance, deduplicate_events
+from .utils.helpers import calculate_distance
 
 logger = logging.getLogger("city_event_crawler")
 logging.basicConfig(
@@ -41,51 +37,29 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
 )
 
-# ---------------------------------------------------------------------------
-# Application lifespan
-# ---------------------------------------------------------------------------
-
-_settings: Settings | None = None
-_crawlers: dict[EventSource, Any] | None = None
-_semaphore: asyncio.Semaphore | None = None
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialise shared resources on startup and tear down on shutdown."""
-    global _settings, _crawlers, _semaphore
-
-    _settings = get_settings()
-    _crawlers = get_all_crawlers()
-    _semaphore = asyncio.Semaphore(_settings.MAX_CONCURRENT_CRAWLERS)
-
+    settings = get_settings()
     logger.info(
-        "Startup complete -- %d crawlers loaded, semaphore=%d",
-        len(_crawlers),
-        _settings.MAX_CONCURRENT_CRAWLERS,
+        "Startup: serpapi=%s apify=%s anthropic=%s db=%s model=%s",
+        bool(settings.SERPAPI_KEY),
+        bool(settings.INSTAGRAM_APIFY_TOKEN),
+        bool(settings.ANTHROPIC_API_KEY),
+        bool(settings.DATABASE_URL),
+        settings.CLAUDE_MODEL,
     )
     yield
+    await close_pool()
+    logger.info("Shutdown.")
 
-    # Cleanup (if crawlers hold connections, close them here)
-    _crawlers = None
-    _semaphore = None
-    logger.info("Shutdown complete.")
-
-
-# ---------------------------------------------------------------------------
-# FastAPI app
-# ---------------------------------------------------------------------------
 
 app = FastAPI(
-    title="City Event Crawler",
-    description=(
-        "Aggregates events from 11+ platforms for European cities. "
-        "Supports filtering by vibe, date, radius, and platform."
-    ),
-    version="1.0.0",
+    title="City Event Crawler v2",
+    description="Instagram deep discovery with Claude-powered curation",
+    version="2.1.0",
     lifespan=lifespan,
 )
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -95,303 +69,266 @@ app.add_middleware(
 )
 
 
-# ---------------------------------------------------------------------------
-# Helper: resolve city to coordinates
-# ---------------------------------------------------------------------------
-
 def _resolve_city(request: SearchRequest) -> tuple[float, float, str]:
-    """Return (latitude, longitude, canonical_city_name) for a request.
-
-    If the request supplies explicit lat/lon those take precedence.
-    Otherwise the city name is looked up in ``CITY_COORDINATES``.
-
-    Raises:
-        HTTPException: If the city is not found and no coordinates given.
-    """
     if request.latitude is not None and request.longitude is not None:
-        return request.latitude, request.longitude, request.city
-
+        return request.latitude, request.longitude, request.city.strip().title()
     city_key = request.city.strip().lower()
-    city_data = CITY_COORDINATES.get(city_key)
-    if city_data is None:
+    data = CITY_COORDINATES.get(city_key)
+    if data is None:
         raise HTTPException(
             status_code=400,
             detail=(
-                f"City '{request.city}' is not in the supported city list. "
-                "Provide explicit latitude/longitude or use GET /api/cities "
-                "to see available cities."
+                f"City '{request.city}' not in supported list. "
+                "Provide explicit latitude/longitude or call GET /api/cities."
             ),
         )
-    return city_data["lat"], city_data["lon"], request.city.strip().title()
+    return data["lat"], data["lon"], request.city.strip().title()
 
 
-# ---------------------------------------------------------------------------
-# Helper: run a single crawler with semaphore + error handling
-# ---------------------------------------------------------------------------
-
-async def _run_crawler(
-    source: EventSource,
-    crawler: Any,
-    city: str,
-    date: str,
-    latitude: float,
-    longitude: float,
-    radius_km: float,
-) -> tuple[EventSource, list[Event], dict | None]:
-    """Execute one crawler inside the semaphore.
-
-    Returns:
-        A 3-tuple of (source, events, error_dict_or_none).
-    """
-    assert _semaphore is not None
-    async with _semaphore:
-        try:
-            logger.info("Starting crawler: %s for %s on %s", source.value, city, date)
-            events = await crawler.crawl(
-                city=city,
-                date=date,
-                lat=latitude,
-                lon=longitude,
-                radius_km=radius_km,
-            )
-            logger.info(
-                "Crawler %s returned %d events", source.value, len(events)
-            )
-            return source, events, None
-        except Exception as exc:
-            tb = traceback.format_exc()
-            logger.error("Crawler %s failed: %s\n%s", source.value, exc, tb)
-            return source, [], {
-                "source": source.value,
-                "error": str(exc),
-                "traceback": tb,
-            }
+def _normalize_title(title: str) -> str:
+    import re
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", "", title.lower())).strip()
 
 
-# ---------------------------------------------------------------------------
-# POST /api/search
-# ---------------------------------------------------------------------------
+def _dedupe_events(events: list[Event]) -> list[Event]:
+    if not events:
+        return []
+    by_day: dict[str, list[Event]] = {}
+    for ev in events:
+        day = ev.date.strftime("%Y-%m-%d") if ev.date else "unknown"
+        by_day.setdefault(day, []).append(ev)
+    kept: list[Event] = []
+    for group in by_day.values():
+        clusters: list[list[Event]] = []
+        for ev in group:
+            t = _normalize_title(ev.title)
+            placed = False
+            for cluster in clusters:
+                rep_t = _normalize_title(cluster[0].title)
+                if SequenceMatcher(None, t, rep_t).ratio() >= 0.65:
+                    cluster.append(ev)
+                    placed = True
+                    break
+            if not placed:
+                clusters.append([ev])
+        for cluster in clusters:
+            kept.append(max(cluster, key=lambda e: (
+                bool(e.description), bool(e.venue_name), bool(e.image_url),
+                e.likes or 0, e.comments or 0,
+            )))
+    return kept
+
 
 @app.post("/api/search", response_model=SearchResponse)
 async def search_events(request: SearchRequest) -> SearchResponse:
-    """Search for events across all (or selected) platforms.
-
-    Runs crawlers concurrently, aggregates and deduplicates results,
-    computes distance from the user's position, filters by vibe if
-    requested, and returns events sorted by engagement score (descending).
-    """
-    assert _settings is not None
-    assert _crawlers is not None
-
+    """Run the v2 pipeline and return events + curated guide + cost telemetry."""
+    settings = get_settings()
     t0 = time.monotonic()
 
-    # 1. Resolve coordinates
     latitude, longitude, city_name = _resolve_city(request)
-
-    # 2. Determine which crawlers to run
-    if request.platforms:
-        sources_to_search = {
-            src: crawler
-            for src, crawler in _crawlers.items()
-            if src in request.platforms
-        }
-    else:
-        sources_to_search = dict(_crawlers)
-
-    sources_searched = list(sources_to_search.keys())
-
-    # 2.5. Run Researcher Agent to discover Instagram accounts
-    research_data = {}
-    try:
-        from .agents.researcher import ResearcherAgent
-        researcher = ResearcherAgent()
-        research_result = await researcher.safe_execute({
-            "city": city_name,
-            "date": request.date,
-            "vibes": request.vibes or [],
-            "searchapi_key": _settings.SERPAPI_KEY,
-        })
-        if research_result.success and research_result.data:
-            research_data = research_result.data
-            logger.info(
-                "Researcher found %d Instagram accounts for %s",
-                len(research_data.get("instagram_accounts", [])),
-                city_name,
-            )
-    except Exception as exc:
-        logger.warning("Researcher agent failed: %s", exc)
-
-    # Inject research context into crawlers that support it
-    for crawler in sources_to_search.values():
-        if hasattr(crawler, "set_research_context"):
-            crawler.set_research_context({
-                "research": research_data,
-                "city": city_name,
-                "date": request.date,
-            })
-
-    # 3. Launch all crawlers concurrently
-    tasks = [
-        _run_crawler(
-            source=source,
-            crawler=crawler,
-            city=city_name,
-            date=request.date,
-            latitude=latitude,
-            longitude=longitude,
-            radius_km=request.radius_km,
-        )
-        for source, crawler in sources_to_search.items()
-    ]
-
-    results = await asyncio.gather(*tasks)
-
-    # 4. Collect events and errors
-    all_events: list[Event] = []
-    sources_with_results: list[EventSource] = []
+    pool = await get_pool()
     errors: list[dict] = []
 
-    for source, events, error in results:
-        if error:
-            errors.append(error)
-        if events:
-            sources_with_results.append(source)
-            all_events.extend(events)
+    accounts: list[str] = []
+    triaged: list[str] = []
+    posts_count = 0
+    stories_count = 0
+    accounts_cache_hit = 0
+    apify_cost = 0.0
+    items: list[dict] = []
+    events: list[Event] = []
+    guide = None
 
-    # 5. Compute distance for every event that has coordinates
-    for event in all_events:
-        if event.latitude is not None and event.longitude is not None:
-            event.distance_km = calculate_distance(
-                latitude, longitude, event.latitude, event.longitude
-            )
+    # --- Budget check ---
+    monthly_spent = await cost_db.monthly_spend_usd(pool)
+    budget_blocked = monthly_spent >= settings.MONTHLY_BUDGET_USD
 
-    # 6. Filter by radius (only events with known location)
-    filtered_events: list[Event] = []
-    for event in all_events:
-        if event.distance_km is not None:
-            if event.distance_km <= request.radius_km:
-                filtered_events.append(event)
-        else:
-            # Keep events without coordinates (we can't filter them out)
-            filtered_events.append(event)
-
-    # 7. Filter by vibes (if specified)
-    if request.vibes:
-        requested_vibes = set(request.vibes)
-        filtered_events = [
-            ev for ev in filtered_events
-            if not ev.vibes or set(ev.vibes) & requested_vibes
-        ]
-
-    # 8. Deduplicate (wrap in try/except to never fail on bad data)
+    # --- DISCOVER ---
     try:
-        filtered_events = deduplicate_events(filtered_events)
-    except Exception as exc:
-        logger.error("Deduplication failed: %s - returning unfiltered", exc)
-
-    # 9. Sort by engagement score (descending), then by date
-    try:
-        filtered_events.sort(
-            key=lambda ev: (ev.engagement_score or 0, ev.date or datetime.min),
-            reverse=True,
+        accounts = await discover_accounts(
+            city=city_name,
+            serpapi_key=settings.SERPAPI_KEY,
+            vibes=request.vibes,
+            max_queries=settings.MAX_DISCOVERY_QUERIES,
         )
     except Exception as exc:
-        logger.warning("Sort failed: %s", exc)
+        logger.error("DISCOVER failed: %s", exc)
+        errors.append({"stage": "discover", "error": str(exc), "traceback": traceback.format_exc()})
 
-    # 10. Truncate to max_results
-    filtered_events = filtered_events[: request.max_results]
+    # --- TRIAGE ---
+    if accounts:
+        try:
+            triaged = await triage_accounts(
+                city=city_name,
+                handles=accounts,
+                vibes=request.vibes,
+                max_keep=settings.MAX_ACCOUNTS_PER_SEARCH,
+            )
+        except Exception as exc:
+            logger.error("TRIAGE failed: %s", exc)
+            errors.append({"stage": "triage", "error": str(exc), "traceback": traceback.format_exc()})
+            triaged = accounts[: settings.MAX_ACCOUNTS_PER_SEARCH]
+
+    # --- SCRAPE (cache-first; bypass actor entirely if budget blocked) ---
+    if triaged:
+        try:
+            if budget_blocked:
+                # Cache-only: read what we have, do not call Apify.
+                from .db import cache as cache_db
+                cached_posts = await cache_db.read_scrape_cache(pool, triaged, "posts")
+                cached_stories = await cache_db.read_scrape_cache(pool, triaged, "stories")
+                for posts_list in cached_posts.values():
+                    for p in posts_list:
+                        p.setdefault("_origin", "profile")
+                        items.append(p)
+                for stories_list in cached_stories.values():
+                    for s in stories_list:
+                        s.setdefault("_origin", "story")
+                        items.append(s)
+                accounts_cache_hit = len(cached_posts) + len(cached_stories)
+                posts_count = sum(len(v) for v in cached_posts.values())
+                stories_count = sum(len(v) for v in cached_stories.values())
+            else:
+                items, summary = await scrape_account_content(triaged, pool=pool)
+                # Count items by origin (covers both cache hits and freshly scraped).
+                posts_count = sum(1 for i in items if i.get("_origin") == "profile")
+                stories_count = sum(1 for i in items if i.get("_origin") == "story")
+                accounts_cache_hit = summary["posts_cache_hit"] + summary["stories_cache_hit"]
+                apify_cost = cost_db.compute_apify_cost(
+                    summary["posts_billed"],
+                    summary["stories_billed"],
+                    posts_per_1k=settings.APIFY_POSTS_USD_PER_1K,
+                    stories_per_1k=settings.APIFY_STORIES_USD_PER_1K,
+                )
+        except Exception as exc:
+            logger.error("SCRAPE failed: %s", exc)
+            errors.append({"stage": "scrape", "error": str(exc), "traceback": traceback.format_exc()})
+
+    # --- EXTRACT ---
+    if items:
+        try:
+            events = await parse_events(items, reference_date=request.date)
+        except Exception as exc:
+            logger.error("EXTRACT failed: %s", exc)
+            errors.append({"stage": "extract", "error": str(exc), "traceback": traceback.format_exc()})
+
+    # --- Dedupe / distance / vibe filter ---
+    if events:
+        events = _dedupe_events(events)
+        for ev in events:
+            if ev.latitude is not None and ev.longitude is not None:
+                ev.distance_km = calculate_distance(latitude, longitude, ev.latitude, ev.longitude)
+        if request.vibes:
+            requested = set(request.vibes)
+            events = [ev for ev in events if not ev.vibes or set(ev.vibes) & requested]
+
+    # --- SCORE ---
+    if events:
+        try:
+            events = await rate_events(events, vibes=request.vibes)
+        except Exception as exc:
+            logger.error("SCORE failed: %s", exc)
+            errors.append({"stage": "score", "error": str(exc), "traceback": traceback.format_exc()})
+
+        events.sort(key=lambda e: (composite_score(e), e.engagement_score), reverse=True)
+        events = events[: request.max_results]
+
+    # --- CURATE ---
+    if events:
+        try:
+            guide = await compose_guide(events=events, city=city_name, vibes=request.vibes)
+        except Exception as exc:
+            logger.error("CURATE failed: %s", exc)
+            errors.append({"stage": "curate", "error": str(exc), "traceback": traceback.format_exc()})
 
     elapsed = round(time.monotonic() - t0, 3)
 
+    # --- Persist run ---
+    await cost_db.record_run(
+        pool,
+        {
+            "city": city_name,
+            "search_date": request.date,
+            "vibes": [v.value for v in (request.vibes or [])],
+            "accounts_discovered": len(accounts),
+            "accounts_triaged": len(triaged),
+            "accounts_cache_hit": accounts_cache_hit,
+            "accounts_scraped": max(0, len(triaged) - accounts_cache_hit),
+            "posts_scraped": posts_count,
+            "stories_scraped": stories_count,
+            "events_extracted": len(events),
+            "apify_results_billed": posts_count + stories_count,
+            "apify_cost_usd": apify_cost,
+            "claude_input_tokens": 0,
+            "claude_output_tokens": 0,
+            "duration_seconds": elapsed,
+            "budget_blocked": budget_blocked,
+            "errors": errors,
+        },
+    )
+
+    new_monthly_spent = await cost_db.monthly_spend_usd(pool)
+
     logger.info(
-        "Search complete for %s on %s: %d events from %d sources in %.3fs",
-        city_name,
-        request.date,
-        len(filtered_events),
-        len(sources_with_results),
-        elapsed,
+        "Search %s/%s done: discovered=%d triaged=%d posts=%d stories=%d events=%d cost=$%.4f in %.2fs",
+        city_name, request.date,
+        len(accounts), len(triaged), posts_count, stories_count, len(events), apify_cost, elapsed,
     )
 
     return SearchResponse(
-        events=filtered_events,
-        total_count=len(filtered_events),
+        events=events,
+        curated_guide=guide,
+        total_count=len(events),
         city=city_name,
         date=request.date,
         search_duration_seconds=elapsed,
-        sources_searched=sources_searched,
-        sources_with_results=sources_with_results,
+        accounts_discovered=len(accounts),
+        accounts_triaged=len(triaged),
+        accounts_cache_hit=accounts_cache_hit,
+        posts_scraped=posts_count,
+        stories_scraped=stories_count,
+        events_extracted=len(events),
+        apify_cost_usd=apify_cost,
+        monthly_spend_usd=new_monthly_spent,
+        monthly_budget_usd=settings.MONTHLY_BUDGET_USD,
+        budget_blocked=budget_blocked,
         errors=errors,
     )
 
 
-# ---------------------------------------------------------------------------
-# GET /api/cities
-# ---------------------------------------------------------------------------
-
 @app.get("/api/cities", response_model=list[CityInfo])
 async def list_cities() -> list[CityInfo]:
-    """Return all supported cities with their coordinates and timezone."""
-    cities: list[CityInfo] = []
-    for key, data in sorted(CITY_COORDINATES.items()):
-        cities.append(
-            CityInfo(
-                name=key.title(),
-                country=data["country"],
-                latitude=data["lat"],
-                longitude=data["lon"],
-                timezone=data["tz"],
-            )
+    return [
+        CityInfo(
+            name=key.title(),
+            country=data["country"],
+            latitude=data["lat"],
+            longitude=data["lon"],
+            timezone=data["tz"],
         )
-    return cities
+        for key, data in sorted(CITY_COORDINATES.items())
+    ]
 
-
-# ---------------------------------------------------------------------------
-# GET /api/vibes
-# ---------------------------------------------------------------------------
 
 @app.get("/api/vibes")
 async def list_vibes() -> list[dict[str, str]]:
-    """Return all available event vibe categories."""
     return [
         {"value": vibe.value, "label": vibe.name.replace("_", " ").title()}
         for vibe in EventVibe
     ]
 
 
-# ---------------------------------------------------------------------------
-# GET /api/sources
-# ---------------------------------------------------------------------------
-
-@app.get("/api/sources")
-async def list_sources() -> list[dict[str, str]]:
-    """Return all available event source platforms."""
-    return [
-        {"value": source.value, "label": source.name.replace("_", " ").title()}
-        for source in EventSource
-    ]
-
-
-# ---------------------------------------------------------------------------
-# GET /api/health
-# ---------------------------------------------------------------------------
-
 @app.get("/api/health")
 async def health_check() -> dict[str, str]:
-    """Basic health / liveness probe."""
-    return {"status": "ok", "service": "city-event-crawler"}
+    settings = get_settings()
+    return {
+        "status": "ok",
+        "service": "city-event-crawler",
+        "version": "2.1.0",
+        "model": settings.CLAUDE_MODEL,
+    }
 
-
-# ---------------------------------------------------------------------------
-# Entrypoint (for direct ``python -m backend.main`` usage)
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     import uvicorn
-
-    uvicorn.run(
-        "backend.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info",
-    )
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
