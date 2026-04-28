@@ -244,11 +244,21 @@ def _render_event_card(ev: dict) -> None:
 def _run_pipeline_sync(request: SearchRequest) -> dict | None:
     """Call the async pipeline from Streamlit's sync context.
 
-    Uses asyncio.run on a fresh event loop. Returns the SearchResponse as a
-    plain dict (JSON-serialised via Pydantic) for downstream rendering.
+    Each click runs in a fresh event loop via asyncio.run. The backend's
+    asyncpg pool is a module global, so we tear it down at the end of each
+    call — otherwise a second click would try to reuse a pool bound to the
+    closed event loop from the first run, raising "Event loop is closed".
     """
+    from backend.db import close_pool
+
+    async def _wrapped():
+        try:
+            return await run_search(request)
+        finally:
+            await close_pool()
+
     try:
-        response = asyncio.run(run_search(request))
+        response = asyncio.run(_wrapped())
         return response.model_dump(mode="json")
     except Exception as exc:
         st.error(f"Search failed: {exc}")
