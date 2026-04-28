@@ -1,0 +1,4 @@
+# Streamlit Community Cloud installs from this file at the repo root.
+# These are the deps for streamlit_app/app.py only — the FastAPI backend
+# has its own requirements.txt under backend/.
+-r streamlit_app/requirements.txt
