@@ -1,4 +1,21 @@
 # Streamlit Community Cloud installs from this file at the repo root.
-# These are the deps for streamlit_app/app.py only — the FastAPI backend
-# has its own requirements.txt under backend/.
--r streamlit_app/requirements.txt
+# As of v2.2, streamlit_app/app.py imports backend.pipeline and runs the
+# whole DISCOVER → ... → CURATE pipeline in-process. So Cloud needs both
+# the Streamlit-side deps AND the backend pipeline deps.
+
+# --- Streamlit dashboard ---
+streamlit>=1.40.0
+psycopg[binary]>=3.2.0
+psycopg-pool>=3.2.0
+pandas>=2.2.0
+python-dotenv>=1.0.0
+
+# --- Backend pipeline (imported directly by Streamlit) ---
+httpx>=0.25.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-dateutil>=2.8.2
+anthropic>=0.40.0
+asyncpg>=0.29.0
+apify-client>=1.7.0
+eval_type_backport>=0.2.0; python_version < "3.10"

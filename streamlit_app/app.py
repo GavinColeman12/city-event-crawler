@@ -2,26 +2,54 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
+import sys
+from pathlib import Path
 
 import streamlit as st
 from dotenv import load_dotenv
 
 load_dotenv()  # local-dev only; harmless on Streamlit Cloud
 
+# Make Streamlit Cloud secrets visible to the backend's pydantic-settings.
+# Settings reads env vars; secrets only land in st.secrets unless we copy.
+def _hoist_secrets_to_env() -> None:
+    try:
+        secrets = dict(st.secrets)
+    except (FileNotFoundError, AttributeError):
+        return
+    for key in (
+        "SERPAPI_KEY",
+        "INSTAGRAM_APIFY_TOKEN",
+        "ANTHROPIC_API_KEY",
+        "DATABASE_URL",
+        "CLAUDE_MODEL",
+        "MONTHLY_BUDGET_USD",
+        "APIFY_POSTS_USD_PER_1K",
+        "APIFY_STORIES_USD_PER_1K",
+        "MAX_ACCOUNTS_PER_SEARCH",
+        "MAX_POSTS_PER_ACCOUNT",
+        "MAX_STORIES_PER_ACCOUNT",
+        "SCRAPE_INCLUDE_STORIES",
+    ):
+        val = secrets.get(key)
+        if val is not None and not os.environ.get(key):
+            os.environ[key] = str(val)
+
+
+_hoist_secrets_to_env()
+
+# Make `backend` importable when this script runs from streamlit_app/.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import db  # noqa: E402  (db.py is in the same directory as this script)
+from backend.models import EventVibe, SearchRequest  # noqa: E402
+from backend.pipeline import run_search  # noqa: E402
 
 MONTHLY_BUDGET_DEFAULT = float(os.environ.get("MONTHLY_BUDGET_USD", "25.0"))
-
-
-def _resolve_backend_url() -> str:
-    url = os.environ.get("BACKEND_URL", "")
-    if url:
-        return url
-    try:
-        return st.secrets["BACKEND_URL"]
-    except (FileNotFoundError, KeyError, AttributeError):
-        return "http://localhost:8000"
 
 
 st.set_page_config(
@@ -213,8 +241,21 @@ def _render_event_card(ev: dict) -> None:
             st.link_button("View on Instagram ↗", url)
 
 
+def _run_pipeline_sync(request: SearchRequest) -> dict | None:
+    """Call the async pipeline from Streamlit's sync context.
+
+    Uses asyncio.run on a fresh event loop. Returns the SearchResponse as a
+    plain dict (JSON-serialised via Pydantic) for downstream rendering.
+    """
+    try:
+        response = asyncio.run(run_search(request))
+        return response.model_dump(mode="json")
+    except Exception as exc:
+        st.error(f"Search failed: {exc}")
+        return None
+
+
 def _tab_search():
-    backend_url = _resolve_backend_url()
     col1, col2, col3 = st.columns([2, 1, 1])
     city = col1.text_input("City", value="berlin")
     date = col2.date_input("Date").isoformat()
@@ -224,21 +265,33 @@ def _tab_search():
         ["open_air", "club_night", "mingle", "headliner", "play_party", "other"],
         default=["club_night"],
     )
-    st.caption(f"Backend: `{backend_url}`")
+
+    # Show what's wired up so misconfiguration is obvious
+    settings_info = {
+        "Apify": bool(os.environ.get("INSTAGRAM_APIFY_TOKEN")),
+        "Anthropic": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "SerpAPI": bool(os.environ.get("SERPAPI_KEY")),
+        "Postgres": bool(os.environ.get("DATABASE_URL")),
+    }
+    missing = [k for k, v in settings_info.items() if not v]
+    if missing:
+        st.warning(f"Missing secrets: {', '.join(missing)}. Add them in Streamlit Cloud settings.")
+    else:
+        st.caption("All API keys configured · pipeline runs in-process")
+
     if st.button("Run search", type="primary"):
-        import httpx
+        try:
+            req = SearchRequest(
+                city=city,
+                date=date,
+                vibes=[EventVibe(v) for v in vibes] if vibes else None,
+                max_results=int(max_results),
+            )
+        except Exception as exc:
+            st.error(f"Invalid input: {exc}")
+            return
         with st.spinner("Running pipeline (this can take 1–3 minutes)..."):
-            try:
-                r = httpx.post(
-                    f"{backend_url}/api/search",
-                    json={"city": city, "date": date, "vibes": vibes, "max_results": int(max_results)},
-                    timeout=300,
-                )
-                r.raise_for_status()
-                data = r.json()
-            except Exception as exc:
-                st.error(f"Search failed: {exc}")
-                data = None
+            data = _run_pipeline_sync(req)
         if data:
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Events", data["total_count"])
