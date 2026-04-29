@@ -16,11 +16,12 @@ import time
 import traceback
 from datetime import datetime
 from difflib import SequenceMatcher
-from typing import Any
+from typing import Any, Optional
+
+import asyncpg
 
 from .config import CITY_COORDINATES, get_settings
 from .db import cost as cost_db
-from .db import get_pool
 from .extraction import compose_guide, parse_events, rate_events
 from .extraction.score import composite_score
 from .instagram import discover_accounts, scrape_account_content, triage_accounts
@@ -82,18 +83,65 @@ def _dedupe_events(events: list[Event]) -> list[Event]:
     return kept
 
 
+async def _open_pool(database_url: str) -> Optional[asyncpg.Pool]:
+    """Open a transient pool scoped to one run_search call.
+
+    Owning the pool inside run_search (instead of as a module global)
+    eliminates the cross-event-loop bug that hits when Streamlit calls
+    asyncio.run() repeatedly: each call gets a fresh loop AND a fresh
+    pool, so no state leaks between calls.
+    """
+    if not database_url:
+        return None
+    try:
+        return await asyncpg.create_pool(
+            dsn=database_url, min_size=1, max_size=4, command_timeout=30,
+        )
+    except Exception as exc:
+        logger.warning("DB pool creation failed (continuing without DB): %s", exc)
+        return None
+
+
 async def run_search(request: SearchRequest) -> SearchResponse:
     """Execute the v2 pipeline end-to-end.
 
-    The same logic as backend.main.search_events but callable directly from
-    any async context (Streamlit, Jupyter, scripts) without spinning up
-    FastAPI.
+    Owns its own DB pool for the duration of the call so it is safe to
+    run repeatedly from a sync context like Streamlit (where each click
+    spins up a fresh asyncio loop via ``asyncio.run``).
     """
     settings = get_settings()
     t0 = time.monotonic()
 
     latitude, longitude, city_name = _resolve_city(request)
-    pool = await get_pool()
+    pool = await _open_pool(settings.DATABASE_URL)
+    try:
+        return await _run_with_pool(
+            request=request,
+            pool=pool,
+            settings=settings,
+            t0=t0,
+            latitude=latitude,
+            longitude=longitude,
+            city_name=city_name,
+        )
+    finally:
+        if pool is not None:
+            try:
+                await pool.close()
+            except Exception as exc:
+                logger.warning("Pool close failed (ignored): %s", exc)
+
+
+async def _run_with_pool(
+    *,
+    request: SearchRequest,
+    pool: Optional[asyncpg.Pool],
+    settings,
+    t0: float,
+    latitude: float,
+    longitude: float,
+    city_name: str,
+) -> SearchResponse:
     errors: list[dict[str, Any]] = []
 
     accounts: list[str] = []
