@@ -27,7 +27,9 @@ class Settings(BaseSettings):
 
     # Apify actors + pricing (per actor; verify on each actor's Apify page).
     APIFY_POSTS_ACTOR: str = Field(default="apify/instagram-api-scraper")
-    APIFY_STORIES_ACTOR: str = Field(default="louisdeconinck/instagram-stories-scraper")
+    # muhammetakkurtt/instagram-scraper: pay-per-result, no rental fee.
+    # Supports resultsType in {posts, userInfo, stories, highlights}.
+    APIFY_STORIES_ACTOR: str = Field(default="muhammetakkurtt/instagram-scraper")
     APIFY_POSTS_USD_PER_1K: float = Field(default=2.30)
     APIFY_STORIES_USD_PER_1K: float = Field(default=2.30)
 

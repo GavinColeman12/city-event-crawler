@@ -153,7 +153,12 @@ async def _scrape_stories_pass(
 
     billed = 0
     if misses:
-        run_input = {"profiles": [_profile_url(h) for h in misses]}
+        # muhammetakkurtt/instagram-scraper input shape: takes plain usernames
+        # (or URLs) under `usernames`, plus resultsType to distinguish content.
+        run_input = {
+            "usernames": misses,
+            "resultsType": "stories",
+        }
         raw = await asyncio.to_thread(
             _run_actor_sync, client, settings.APIFY_STORIES_ACTOR, run_input
         )

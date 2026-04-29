@@ -35,11 +35,12 @@ async def test_two_passes_invoke_two_actors(monkeypatch):
     """When token is set, both posts and stories actors are called once."""
     _reset_settings(monkeypatch, INSTAGRAM_APIFY_TOKEN="fake_token")
 
-    calls: list[str] = []
+    calls: list[tuple[str, dict]] = []
 
     def fake_run(client, actor_id, run_input):
-        calls.append(actor_id)
-        if "stories" in actor_id:
+        calls.append((actor_id, run_input))
+        # The stories pass passes resultsType=stories; posts pass uses resultsType=posts.
+        if run_input.get("resultsType") == "stories":
             return [_fake_story("acc1", "s1"), _fake_story("acc2", "s2")]
         return [_fake_post("acc1", "p1"), _fake_post("acc2", "p2")]
 
@@ -49,8 +50,11 @@ async def test_two_passes_invoke_two_actors(monkeypatch):
         )
 
     assert len(calls) == 2
-    assert any("instagram-api-scraper" in c for c in calls)
-    assert any("instagram-stories-scraper" in c for c in calls)
+    actor_ids = [c[0] for c in calls]
+    assert any("apify/instagram-api-scraper" == a for a in actor_ids)
+    # The stories actor is configurable; just assert one of the calls used
+    # resultsType=stories.
+    assert any(c[1].get("resultsType") == "stories" for c in calls)
     assert summary["posts_billed"] == 2
     assert summary["stories_billed"] == 2
     # All items get an _origin tag.
@@ -108,7 +112,7 @@ async def test_per_account_story_cap(monkeypatch):
     )
 
     def fake_run(client, actor_id, run_input):
-        if "stories" in actor_id:
+        if run_input.get("resultsType") == "stories":
             # 5 stories from same account
             return [_fake_story("acc1", f"s{i}") for i in range(5)]
         return []
