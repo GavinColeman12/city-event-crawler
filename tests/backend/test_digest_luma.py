@@ -168,4 +168,36 @@ def test_non_200_detail_logs_warning(data, caplog):
         events = asyncio.run(go())
     assert len(events) == 7                        # events survive without their detail enrichment
     msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-    assert len(msgs) == 7 and all("HTTP 503" in m for m in msgs)
+    # one summary line, not one per event — the orchestrator shows these to the reader
+    assert len(msgs) == 1 and "7 of 7" in msgs[0] and "HTTP 503" in msgs[0]
+
+
+def test_a_single_failed_detail_is_not_worth_a_warning(data, caplog):
+    """Losing one event's description must not mark the whole source 'partial'."""
+    import asyncio
+    import logging
+
+    import httpx
+
+    from backend.digest.cities import get_city
+
+    feed = copy.deepcopy(data["feed"])
+    seen = []
+
+    def handler(request):
+        if request.url.path == "/discover/get-paginated-events":
+            return httpx.Response(200, json=dict(feed, has_more=False, next_cursor=None))
+        seen.append(request)
+        if len(seen) == 1:
+            return httpx.Response(503)              # exactly one detail request fails
+        return httpx.Response(200, json={})
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await luma.collect(get_city("barcelona"), START, END, client)
+
+    with caplog.at_level(logging.INFO, logger="backend.digest.collectors.luma"):
+        events = asyncio.run(go())
+    assert len(events) == 7
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert any("1 of 7 event detail requests failed" in r.getMessage() for r in caplog.records)

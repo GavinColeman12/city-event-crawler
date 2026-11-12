@@ -279,21 +279,27 @@ async def collect(city, start, end, client) -> List[DigestEvent]:
 
     sem = asyncio.Semaphore(CONCURRENCY)
 
+    detail_failures: List[str] = []
+
     async def detail(entry: dict) -> Optional[dict]:
         async with sem:
             try:
                 r = await client.get(API + "/event/get", params={"event_api_id": entry["api_id"]})
                 if r.status_code != 200:
-                    log.warning("luma detail %s returned HTTP %d: description and categories missing",
-                                entry.get("api_id"), r.status_code)
+                    detail_failures.append("HTTP %d" % r.status_code)
                     return None
                 return r.json()
             except Exception as exc:  # noqa: BLE001 — partial failure: skip the enrichment
-                log.warning("luma detail %s failed (%s): description and categories missing",
-                            entry.get("api_id"), _why(exc))
+                detail_failures.append(_why(exc))
                 return None
 
     details = await asyncio.gather(*[detail(e) for e in chosen])
+    if detail_failures:
+        # Enrichment only — every event is still returned.  It becomes a warning
+        # (which marks the source "partial") only when a quarter or more failed.
+        level = logging.WARNING if len(detail_failures) * 4 >= len(chosen) else logging.INFO
+        log.log(level, "luma: %d of %d event detail requests failed (%s): description and categories missing for those",
+                len(detail_failures), len(chosen), detail_failures[0])
     events: List[DigestEvent] = []
     for entry, det in zip(chosen, details):
         ev = parse_entry(entry, tz, det)

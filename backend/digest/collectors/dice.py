@@ -375,8 +375,11 @@ async def collect(city, start: datetime, end: datetime, client: httpx.AsyncClien
     detail_errors: List[Tuple[str, Exception]] = []
     details = {eid: d for eid, d in await asyncio.gather(*(detail(i) for i in wanted)) if d}
     if detail_errors:
-        log.warning("dice: %d of %d event detail pages failed (%s): lineup/promoter missing for those",
-                    len(detail_errors), len(wanted), _why(detail_errors[0][1]))
+        # Enrichment only — every event is still returned.  It becomes a warning
+        # (which marks the source "partial") only when a quarter or more failed.
+        level = logging.WARNING if len(detail_errors) * 4 >= len(wanted) else logging.INFO
+        log.log(level, "dice: %d of %d event detail pages failed (%s): lineup/promoter missing for those",
+                len(detail_errors), len(wanted), _why(detail_errors[0][1]))
     return parse_events(listings, details, city, start, end)
 
 

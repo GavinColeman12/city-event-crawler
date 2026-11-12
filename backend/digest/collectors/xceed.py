@@ -321,13 +321,14 @@ async def collect(city, start, end, client) -> List[DigestEvent]:
         return []
 
     sem = asyncio.Semaphore(CONCURRENCY)
+    enrich_failures: List[str] = []
 
     async def guarded(label, coro_factory):
         async with sem:
             try:
                 return await coro_factory()
-            except Exception as exc:  # noqa: BLE001 — partial failure: log and skip this piece
-                log.warning("xceed: %s failed (%s): that detail is missing", label, _why(exc))
+            except Exception as exc:  # noqa: BLE001 — partial failure: skip this piece, report below
+                enrich_failures.append("%s (%s)" % (label, _why(exc)))
                 return None
 
     async def detail(item):
@@ -360,6 +361,14 @@ async def collect(city, start, end, client) -> List[DigestEvent]:
         asyncio.gather(*[venue(s) for s in venue_slugs]),
         popular(),
     )
+    if enrich_failures:
+        # Enrichment only — every listed event is still returned.  It becomes a
+        # warning (which marks the source "partial") only when a quarter or more
+        # of the lookups failed.
+        attempted = 2 * len(items) + len(venue_slugs) + 1
+        level = logging.WARNING if len(enrich_failures) * 4 >= attempted else logging.INFO
+        log.log(level, "xceed: %d of %d detail lookups failed (e.g. %s): price, promoter or ranking missing for those",
+                len(enrich_failures), attempted, enrich_failures[0])
     venues = dict(zip(venue_slugs, venue_payloads))
     rank_pool = len(popular_ids)
 
