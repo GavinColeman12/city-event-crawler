@@ -269,7 +269,7 @@ _POPULARITY_MAX = 60.0
 _SOURCE_PRIOR = {"meetup": 8, "ra": 8, "xceed": 7, "dice": 7, "luma": 6, "eventbrite": 5}
 
 _BOOSTS = (
-    ("international crowd", 8, r"international|expats?|erasmus|foreigners?|newcomers?|new in (?:town|barcelona)"
+    ("international crowd", 0, r"international|expats?|erasmus|foreigners?|newcomers?|new in (?:town|barcelona)"
      r"|english[- ]speaking|in english|language exchange|intercambio de idiomas|intercanvi d.idiomes"
      r"|multilingual|polyglot|digital nomads?|couchsurfing|internations"),
     ("social", 5, r"social|mixer|meet new people|make (?:new )?friends|after ?work|networking|pub crawl"
@@ -375,10 +375,7 @@ def score(candidate: Candidate) -> None:
     # 2. Written in English → a fair sign internationals are the audience.
     candidate.language = detect_language(ev.title, ev.description)
     if candidate.language == "en":
-        total += 6
-        signals.append("listing in English")
-    elif candidate.language == "local":
-        total -= 2
+        signals.append("listing in English")   # informational only: ranking is by popularity
 
     # 3. What kind of event it is.
     body = fold(" ".join(filter(None, [ev.title, ev.description, ev.organizer, " ".join(str(t) for t in ev.tags)])))

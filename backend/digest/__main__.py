@@ -2,11 +2,13 @@
 
     python -m backend.digest collect --out candidates.json      # scrape + shortlist
     python -m backend.digest render --candidates candidates.json --picks picks.json --out message.txt
+    python -m backend.digest publish --candidates candidates.json --file message.txt   # hand to the Mac relay (iMessage)
     python -m backend.digest send --file message.txt            # WhatsApp
     python -m backend.digest auto [--send]                      # all of it, heuristic picks, no model
     python -m backend.digest check                              # what is configured / reachable
 
-Exit codes: 0 ok · 1 bad input · 2 nothing collected · 3 WhatsApp not configured · 4 WhatsApp send failed.
+Exit codes: 0 ok · 1 bad input · 2 nothing collected · 3 WhatsApp not configured · 4 WhatsApp send failed
+            · 5 publish failed.
 """
 from __future__ import annotations
 
@@ -19,12 +21,12 @@ import sys
 from datetime import datetime
 from typing import List, Optional
 
-from backend.digest import engine, render, whatsapp
+from backend.digest import engine, outbox, render, whatsapp
 from backend.digest.cities import get_city
 from backend.digest.collectors import REGISTRY
 from backend.digest.http import make_client
 
-EXIT_OK, EXIT_BAD_INPUT, EXIT_NOTHING, EXIT_NOT_CONFIGURED, EXIT_SEND_FAILED = 0, 1, 2, 3, 4
+EXIT_OK, EXIT_BAD_INPUT, EXIT_NOTHING, EXIT_NOT_CONFIGURED, EXIT_SEND_FAILED, EXIT_PUBLISH_FAILED = 0, 1, 2, 3, 4, 5
 
 
 def _load_dotenv() -> None:
@@ -161,6 +163,24 @@ def _send(message: str, dry_run: bool) -> int:
     return EXIT_SEND_FAILED
 
 
+def cmd_publish(args) -> int:
+    payload = _read_json(args.candidates)
+    with open(args.file, encoding="utf-8") as handle:
+        message = handle.read()
+    if not message.strip():
+        print("Nothing to publish: the message is empty.", file=sys.stderr)
+        return EXIT_BAD_INPUT
+    record = outbox.build_record(payload, message)
+    try:
+        commit = outbox.publish(record, remote=args.remote, branch=args.branch)
+    except outbox.OutboxError as exc:
+        print("PUBLISH FAILED: %s" % exc, file=sys.stderr)
+        return EXIT_PUBLISH_FAILED
+    print("PUBLISHED: digest for %s is on branch %s (%s) — the Mac relay will deliver it by iMessage."
+          % (record["date"], args.branch, commit[:8]))
+    return EXIT_OK
+
+
 def cmd_send(args) -> int:
     if args.file:
         with open(args.file, encoding="utf-8") as handle:
@@ -243,6 +263,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     rendering.add_argument("--picks", required=True)
     rendering.add_argument("--out")
     rendering.set_defaults(run=cmd_render)
+
+    publishing = commands.add_parser("publish", help="commit the digest to the outbox branch for the Mac relay")
+    publishing.add_argument("--candidates", required=True)
+    publishing.add_argument("--file", required=True, help="the rendered message")
+    publishing.add_argument("--remote", default="origin")
+    publishing.add_argument("--branch", default=outbox.OUTBOX_BRANCH)
+    publishing.set_defaults(run=cmd_publish)
 
     sending = commands.add_parser("send", help="send a message file (or stdin) to WhatsApp")
     sending.add_argument("--file")

@@ -12,8 +12,8 @@ and the five best **tomorrow**, so he can decide where to go with friends withou
 researching anything himself. He is in his twenties, works in tech and startups,
 speaks English, and goes out with an international crowd.
 
-What he asked for, in his words: the events that are *most popular with expat
-communities*, with *the stats* for each, and *no kinky parties*.
+What he asked for: the **most popular** events in the city, whoever they are
+for — locals or visitors — with *the stats* for each, and *no kinky parties*.
 
 ## The job
 
@@ -45,38 +45,32 @@ Everything runs from the repository root with `python3`. The only dependency is
    choosing). Each candidate has an id in square brackets and a `stats` line
    holding the real numbers the sources published.
 
-3. **Look for the big things scrapers miss** (optional, at most five web searches)
+3. **Find the big things scrapers miss** (required — up to eight web searches)
 
-   The sources above are strong on socials and club nights and weak on marquee
-   events. If you have a web search tool, check quickly whether today or tomorrow
-   has something an international visitor would not want to miss: a major concert
-   (Palau Sant Jordi, Sant Jordi Club, Razzmatazz, Apolo), an FC Barcelona home
-   match, a city festival or holiday. Include one only if you find the specific
-   event with a date and venue that your sources agree on, and it would genuinely
-   outrank something already on your list. Link the artist's, venue's or ticket
-   seller's page when you can; a listings page (Songkick, Bandsintown) will do
-   if nothing better turns up. If sources disagree on the date or venue, leave
-   it out. It goes in as a `custom` pick (format below). If you have no search
-   tool or find nothing, skip this step — do not guess.
+   The sources above are strong on socials and club nights and weak on the
+   events that draw the biggest crowds. Search for today and tomorrow: arena and
+   stadium concerts (Palau Sant Jordi, Sant Jordi Club, Estadi Olímpic,
+   Razzmatazz, Apolo), FC Barcelona and Espanyol home matches, festivals, fairs,
+   city celebrations and public holidays. Add each one you can pin down — a
+   specific event with a date and venue your sources agree on — as a `custom`
+   pick candidate, with the best link you found (artist, venue or ticket seller;
+   a listings page will do). If sources disagree on date or venue, mention it in
+   `note` instead of listing it. Only skip this step if you have no search tool.
 
 4. **Pick up to five for today and up to five for tomorrow**
 
    How to judge:
 
-   - **Popularity is the backbone.** Use the real headcounts — "going" on Meetup,
-     "interested" on RA, "guests" on Luma — and the other demand signals (RA Pick,
-     selling fast, Xceed's popularity rank). Compare like with like: 60 going is a
-     big meetup, 60 interested is a small club night; 500 interested is a packed
-     one.
-   - **International crowd.** Favour listings written in English, organisers that
-     exist for expats and newcomers (language exchanges, international socials,
-     nomad and Erasmus groups), and clubs and promoters that draw visitors.
-   - **Things he would actually go to:** socials and language exchanges, founder
-     and tech meetups, bars with something on, club nights with a real line-up,
-     concerts, rooftop / open-air / boat parties, comedy in English.
-     Not: kids and family events, courses and multi-week classes, sales or
-     investment seminars, religious or support groups, anything online, niche
-     hobby meetups with a handful of people.
+   - **Popularity decides.** Rank by how many people will be there: real
+     headcounts ("going" on Meetup, "interested" on RA, "guests" on Luma), venue
+     capacity for concerts and matches, and demand signals (sold out, RA Pick,
+     selling fast, Xceed's popularity rank). Compare like with like: 60 going is
+     a big meetup, 500 interested is a packed club night, an arena show beats both.
+     Language and audience do not matter — a Catalan-language event with a huge
+     crowd outranks a small English-speaking one.
+   - **Still things worth an evening:** concerts, club nights, festivals, matches,
+     big socials. Not: kids' events, courses, sales seminars, religious or support
+     groups, anything online.
    - **Never:** anything kink, fetish, swinger, sex-positive or erotic. The script
      has already removed the obvious ones; if something of that kind slipped
      through under an innocent title, leave it out.
@@ -142,11 +136,18 @@ Everything runs from the repository root with `python3`. The only dependency is
    `/tmp/message.txt` the way Gavin will on his phone. If a pick now looks weak
    next to the others, swap it and re-render.
 
-7. **Send**
+7. **Publish for iMessage, then send**
 
    ```
+   python3 -m backend.digest publish --candidates /tmp/candidates.json --file /tmp/message.txt
    python3 -m backend.digest send --file /tmp/message.txt
    ```
+
+   `publish` commits the digest to the `claude/digest-outbox` branch; Gavin's Mac
+   picks it up and delivers it by iMessage. If it prints PUBLISH FAILED, report
+   it and carry on. `send` is WhatsApp; exit 3 (not configured) is expected for
+   now and is not an error. When `publish` worked, start the fallback push with
+   "Full digest is on its way by iMessage."
 
    Send once per run.
 

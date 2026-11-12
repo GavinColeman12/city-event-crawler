@@ -401,3 +401,39 @@ def render_message(payload: dict, picks: dict) -> str:
 
     sections.append("_%s_" % _coverage_line(payload))
     return "\n\n".join(sections)
+
+
+# ───────────────────────── plain text (iMessage, SMS) ─────────────────────────
+
+_BOLD_LINE = re.compile(r"^(🎉 )?\*(.+)\*$")
+_ITALIC_LINE = re.compile(r"^_(.+)_$")
+
+
+def _strip_markup(line: str) -> str:
+    """Remove WhatsApp's *bold* / _italic_ markers, which other apps print literally.
+
+    Only markers that wrap a whole line are touched — that is the only place
+    ``render_message`` puts them — so an underscore inside a link survives.
+    """
+    text = line.strip()
+    if text.startswith("━━"):
+        return text.strip("━ ").strip("*").strip()
+    for pattern in (_BOLD_LINE, _ITALIC_LINE):
+        match = pattern.match(text)
+        if match:
+            return "".join(group or "" for group in match.groups())
+    return line
+
+
+def plain_messages(message: str) -> List[str]:
+    """The digest as plain text, in two parts: today (with the header) and tomorrow (with the footer)."""
+    parts: List[str] = []
+    current: List[str] = []
+    for block in message.strip().split("\n\n"):
+        if block.startswith("━━") and "TOMORROW" in block and current:
+            parts.append("\n\n".join(current))
+            current = []
+        current.append("\n".join(_strip_markup(line) for line in block.split("\n")))
+    if current:
+        parts.append("\n\n".join(current))
+    return parts
