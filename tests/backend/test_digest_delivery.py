@@ -317,9 +317,45 @@ def test_cli_render_rejects_bad_picks_with_exit_code_1(workdir, capsys):
 
 
 def test_cli_send_without_configuration_exits_3_and_sends_nothing(workdir, capsys):
-    (workdir / "message.txt").write_text("hello", encoding="utf-8")
+    (workdir / "message.txt").write_text("🎉 *Barcelona*\n\n*1. Rooftop social*", encoding="utf-8")
     assert cli.main(["send", "--file", "message.txt"]) == 3
-    assert "WHATSAPP NOT CONFIGURED: missing WHATSAPP_PHONE and WHATSAPP_APIKEY" in capsys.readouterr().err
+    captured = capsys.readouterr()
+    assert "WHATSAPP NOT CONFIGURED: missing WHATSAPP_PHONE and WHATSAPP_APIKEY" in captured.err
+    # the digest still ends up in the run's output — the cloud sandbox is thrown away afterwards
+    assert "----- THE MESSAGE THAT WAS NOT DELIVERED -----\n🎉 *Barcelona*\n\n*1. Rooftop social*\n----- END OF MESSAGE -----" in captured.out
+
+
+def test_cli_send_failure_exits_4_and_still_prints_the_message(workdir, capsys, monkeypatch):
+    monkeypatch.setenv("WHATSAPP_PHONE", "+34600000000")
+    monkeypatch.setenv("WHATSAPP_APIKEY", "bad-key")
+
+    def refuse(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="ERROR: APIKey is invalid.")
+
+    monkeypatch.setattr(cli, "make_client", lambda **kw: make_client(transport=httpx.MockTransport(refuse), **kw))
+    (workdir / "message.txt").write_text("the digest", encoding="utf-8")
+    assert cli.main(["send", "--file", "message.txt"]) == 4
+    captured = capsys.readouterr()
+    assert "WHATSAPP SEND FAILED after 0 of 1 message(s)." in captured.err
+    assert "message 1/1: FAILED (HTTP 200) ERROR: APIKey is invalid." in captured.out
+    assert "THE MESSAGE THAT WAS NOT DELIVERED -----\nthe digest\n" in captured.out
+    assert "bad-key" not in captured.out + captured.err
+
+
+def test_cli_send_success_reports_sent(workdir, capsys, monkeypatch):
+    monkeypatch.setenv("WHATSAPP_PHONE", "+34600000000")
+    monkeypatch.setenv("WHATSAPP_APIKEY", "good-key")
+    monkeypatch.setattr(whatsapp, "PAUSE_BETWEEN_CHUNKS_SECS", 0)
+
+    def accept(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="Message queued. You will receive it in a few seconds.")
+
+    monkeypatch.setattr(cli, "make_client", lambda **kw: make_client(transport=httpx.MockTransport(accept), **kw))
+    (workdir / "message.txt").write_text("the digest", encoding="utf-8")
+    assert cli.main(["send", "--file", "message.txt"]) == 0
+    captured = capsys.readouterr()
+    assert "WHATSAPP SENT: 1 message(s) accepted by callmebot." in captured.out
+    assert "NOT DELIVERED" not in captured.out and "good-key" not in captured.out + captured.err
 
 
 def test_cli_send_refuses_an_empty_message(workdir):

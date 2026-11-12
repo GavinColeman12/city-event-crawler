@@ -162,11 +162,17 @@ Everything runs from the repository root with `python3`. The only dependency is
   environment → Network access → Allowed domains.
 - **Nothing was collected** (`collect` exits 2). Do not send an empty digest. If
   WhatsApp is configured, write a two-line message saying today's digest could not
-  be built and why, and send that instead.
-- **`send` exits 3 — WhatsApp not configured.** Nothing can be sent. Print the full
-  message in your final report so it can be read in this session.
+  be built and why, and send that instead. Otherwise use the fallback below.
+- **`send` exits 3 — WhatsApp not configured.** Nothing can go out over WhatsApp.
+  Use the fallback below.
 - **`send` exits 4 — the provider refused.** Wait 30 seconds and try once more. If
-  it fails again, stop and report the provider's response word for word.
+  it fails again, report the provider's response word for word and use the
+  fallback below.
+- **Fallback when WhatsApp could not deliver.** The digest should still reach
+  Gavin's phone. If you have a push-notification tool, send him exactly one push:
+  first a few words on why it is not on WhatsApp, then today's picks and
+  tomorrow's picks in short form (rank, name, start time, venue — one line each,
+  no links). If you have no such tool, the final report is the only delivery.
 - **A source returns 0 events or a parse error** on an ordinary day. That usually
   means the site changed. Mention it in the final report.
 
@@ -186,5 +192,6 @@ End with a short plain-text report:
    exactly as the send step reported.
 2. One line per source with its event count, plus anything blocked, partial or
    broken, and any step you skipped.
-3. The message text, in full.
+3. The message text, pasted in full. Do not summarise it or point to a file —
+   the sandbox, and every file in it, is discarded when the run ends.
 4. Anything that needs fixing before tomorrow's run.

@@ -123,6 +123,13 @@ def cmd_render(args) -> int:
     return EXIT_OK
 
 
+def _echo_undelivered(message: str) -> None:
+    """Put an undelivered digest in the run's output, so the work is never lost with the sandbox."""
+    print("----- THE MESSAGE THAT WAS NOT DELIVERED -----")
+    print(message.strip())
+    print("----- END OF MESSAGE -----")
+
+
 def _send(message: str, dry_run: bool) -> int:
     if dry_run:
         chunks = whatsapp.split_message(message)
@@ -134,6 +141,7 @@ def _send(message: str, dry_run: bool) -> int:
         cfg = whatsapp.config_from_env()
     except whatsapp.NotConfigured as exc:
         print("WHATSAPP NOT CONFIGURED: %s. Nothing was sent." % exc, file=sys.stderr)
+        _echo_undelivered(message)
         return EXIT_NOT_CONFIGURED
     chunks = whatsapp.split_message(message, cfg.chunk_chars)
 
@@ -149,6 +157,7 @@ def _send(message: str, dry_run: bool) -> int:
         print("WHATSAPP SENT: %d message(s) accepted by %s." % (len(chunks), cfg.provider))
         return EXIT_OK
     print("WHATSAPP SEND FAILED after %d of %d message(s)." % (sum(r.ok for r in results), len(chunks)), file=sys.stderr)
+    _echo_undelivered(message)
     return EXIT_SEND_FAILED
 
 
