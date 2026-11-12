@@ -142,15 +142,18 @@ def test_one_organiser_listing_twice_on_one_site_is_two_events():
     assert len(merged) == 2 and all(c.same_source_attending() < 20 for c in merged)
 
 
-def test_numbers_are_never_borrowed_from_another_listing():
+def test_numbers_and_neighbourhoods_are_never_borrowed_from_another_listing():
     events = [
         make(source="ra", title="Throwback", venue="La Terrrazza", organizer="Throwback Barcelona",
              attending=580, attending_label="interested"),
-        make(source="xceed", title="Throwback", venue="La Terrrazza", organizer_followers=392, capacity=900),
+        make(source="xceed", title="Throwback", venue="La Terrrazza", organizer_followers=392, capacity=900,
+             area="Barri Gotic", address="Av. Francesc Ferrer i Guàrdia"),
     ]
     one = cand.merge_duplicates(events)[0]
     assert one.event.source == "ra"
     assert one.event.organizer_followers is None and one.event.capacity is None
+    assert one.event.area is None                       # another site's geocoding stays with that site
+    assert one.event.address == "Av. Francesc Ferrer i Guàrdia"   # a plain descriptive gap is still filled
 
 
 # ───────────── today / tomorrow ─────────────

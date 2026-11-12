@@ -185,8 +185,10 @@ def merge_duplicates(events: List[DigestEvent]) -> List[Candidate]:
         for other in group[1:]:
             # Descriptive gaps may be filled from another listing.  Numbers may
             # not: a capacity or follower count belongs to the site that
-            # published it, and would be misattributed on the primary.
-            for name in ("end", "venue", "address", "area", "price", "is_free", "sold_out",
+            # published it, and would be misattributed on the primary.  Nor may
+            # the neighbourhood: it is each site's own geocoding, and one of
+            # them files the W Hotel on the beach under "Barri Gòtic".
+            for name in ("end", "venue", "address", "price", "is_free", "sold_out",
                          "description", "organizer"):
                 if getattr(primary, name) in (None, "") and name not in fill and getattr(other, name) not in (None, ""):
                     fill[name] = getattr(other, name)
