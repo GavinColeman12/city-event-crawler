@@ -74,8 +74,9 @@ Everything runs from the repository root with `python3`. The only dependency is
      Language and audience do not matter — a Catalan-language event with a huge
      crowd outranks a small English-speaking one.
    - **City-guide finds come first.** Gavin asked for this explicitly: when
-     @planesenbarcelona or @barcelonasecreta (marked CITY GUIDE in the brief)
-     feature something happening today or tomorrow — a street wine fair, a
+     a city-guide account (@planesenbarcelona, @barcelonasecreta, @whatsonbcn,
+     @ordatwins — marked CITY GUIDE in the brief)
+     features something happening today or tomorrow — a street wine fair, a
      market, a neighbourhood festival, a food festival, a free open-air event —
      treat it as a top candidate and aim to give these one or two of each day's
      five slots, ahead of an ordinary club night or meetup. Their weekend

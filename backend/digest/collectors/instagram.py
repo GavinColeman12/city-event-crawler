@@ -101,6 +101,8 @@ CITY_HANDLES: Dict[str, List[str]] = {
         "barcelonainternationalsocial",  # Barcelona International Social (site + Meetup/search listing)
         "planesenbarcelona",             # Planes en Barcelona city guide, ~236K followers (added at Gavin's request)
         "barcelonasecreta",              # Barcelona Secreta city guide, ~995K followers (added at Gavin's request)
+        "whatsonbcn",                    # What's On Barcelona weekly rundown, ~3.5K followers (added at Gavin's request)
+        "ordatwins",                     # Orda Twins, Barcelona guides by two creators, ~153K followers (added at Gavin's request)
     ],
 }
 
@@ -108,7 +110,7 @@ CITY_HANDLES: Dict[str, List[str]] = {
 # the city (street fairs, markets, festivals).  Gavin asked for what they feature
 # to be prioritised, so the brief shows their posts first and in full.
 GUIDE_HANDLES: Dict[str, List[str]] = {
-    "barcelona": ["planesenbarcelona", "barcelonasecreta"],
+    "barcelona": ["planesenbarcelona", "barcelonasecreta", "whatsonbcn", "ordatwins"],
 }
 
 # NOT used by default.  Each is linked from the organisation's own website
