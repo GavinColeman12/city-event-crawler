@@ -71,6 +71,8 @@ CITY_HANDLES: Dict[str, List[str]] = {
         "sala_apolo",                    # Sala Apolo / Nitsa (site + Wikidata)
         "newinbarcelona",                # New in Barcelona expat community (site + Meetup page)
         "barcelonainternationalsocial",  # Barcelona International Social (site + Meetup/search listing)
+        "planesenbarcelona",             # Planes en Barcelona city guide, ~236K followers (added at Gavin's request)
+        "barcelonasecreta",              # Barcelona Secreta city guide, ~995K followers (added at Gavin's request)
     ],
 }
 
@@ -80,7 +82,7 @@ CITY_HANDLES: Dict[str, List[str]] = {
 # recent posts from the handle.
 CANDIDATE_HANDLES: Dict[str, List[str]] = {
     "barcelona": [
-        "timeoutbcn", "barcelonametropolitan", "barcelona.secret", "thisisbarcelona_official",
+        "timeoutbcn", "barcelonametropolitan", "thisisbarcelona_official",
         "ottozutzclub", "moog_barcelona", "opiumbarcelona", "shokobarcelona", "laterrrazza",
         "brunchbcn", "pobleespanyol",
     ],
