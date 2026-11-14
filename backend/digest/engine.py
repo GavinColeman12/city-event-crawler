@@ -102,27 +102,48 @@ async def _run_collector(name: str, city: City, start: datetime, end: datetime, 
     return events, status
 
 
-async def _run_instagram(city: City, client, token: str) -> Tuple[List[dict], dict]:
-    status: dict = {"ok": False, "posts": 0, "seconds": 0.0, "error": None}
+async def _run_instagram(city: City, client, token: str, stories_dir: Optional[str] = None) -> Tuple[List[dict], dict]:
+    """Posts and stories, each from its own Apify actor.  One failing does not sink the other."""
+    status: dict = {"ok": False, "posts": 0, "stories": 0, "seconds": 0.0, "error": None, "warnings": []}
     began = time.monotonic()
-    posts: List[dict] = []
-    try:
-        module = load("instagram")
-        posts = await asyncio.wait_for(module.collect_posts(city, client, token), INSTAGRAM_TIMEOUT_SECS)
-    except asyncio.TimeoutError:
-        status["error"] = "timed out after %ds" % INSTAGRAM_TIMEOUT_SECS
-    except CollectorError as exc:
-        status["error"] = str(exc)
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("instagram collector crashed")
-        status["error"] = "%s: %s" % (type(exc).__name__, exc)
+    module = load("instagram")
+    jobs = {"posts": module.collect_posts}
+    if getattr(module, "collect_stories", None):
+        jobs["stories"] = module.collect_stories
+    results = await asyncio.gather(
+        *[asyncio.wait_for(job(city, client, token), INSTAGRAM_TIMEOUT_SECS) for job in jobs.values()],
+        return_exceptions=True)
+    found: List[dict] = []
+    errors: List[str] = []
+    for kind, result in zip(jobs, results):
+        if isinstance(result, asyncio.TimeoutError):
+            errors.append("%s timed out after %ds" % (kind, INSTAGRAM_TIMEOUT_SECS))
+        elif isinstance(result, CollectorError):
+            errors.append("%s: %s" % (kind, result))
+        elif isinstance(result, BaseException):
+            logger.error("instagram %s collector crashed", kind, exc_info=result)
+            errors.append("%s: %s: %s" % (kind, type(result).__name__, result))
+        else:
+            # The content guardrail applies to captions too.
+            kept = [p for p in result if not blocked_term(p.get("caption"), p.get("handle"))]
+            status[kind] = len(kept)
+            status["ok"] = True
+            found.extend(kept)
+    if status["ok"]:
+        status["warnings"] = errors
     else:
-        # The content guardrail applies to captions too.
-        posts = [p for p in posts if not blocked_term(p.get("caption"), p.get("handle"))]
-        status["ok"] = True
-        status["posts"] = len(posts)
+        status["error"] = "; ".join(errors)
+    stories = [p for p in found if p.get("kind") == "story"]
+    if stories and stories_dir and getattr(module, "download_story_images", None):
+        try:
+            saved = await module.download_story_images(stories, client, stories_dir)
+        except Exception as exc:  # noqa: BLE001
+            saved = 0
+            status["warnings"].append("story images not saved (%s)" % type(exc).__name__)
+        if saved < len(stories):
+            status["warnings"].append("%d of %d story images could not be downloaded" % (len(stories) - saved, len(stories)))
     status["seconds"] = round(time.monotonic() - began, 1)
-    return posts, status
+    return found, status
 
 
 async def collect_all(
@@ -131,8 +152,13 @@ async def collect_all(
     sources: Optional[Sequence[str]] = None,
     with_instagram: bool = True,
     env: Optional[dict] = None,
+    stories_dir: Optional[str] = None,
 ) -> Tuple[List[DigestEvent], Dict[str, dict], List[dict], List[str]]:
-    """Returns (events, per-source status, instagram posts, hosts blocked by the sandbox)."""
+    """Returns (events, per-source status, instagram posts + stories, hosts blocked by the sandbox).
+
+    Stories are the dicts with ``kind == "story"``; their images are saved under
+    ``stories_dir`` when one is given.
+    """
     env = os.environ if env is None else env
     names = [n for n in (sources or REGISTRY) if n != "instagram"]
     start, end = collection_window(city, now)
@@ -146,7 +172,7 @@ async def collect_all(
             token = (env.get(APIFY_TOKEN_ENV) or "").strip()
             run_instagram = with_instagram and bool(token) and (sources is None or "instagram" in sources)
             if run_instagram:
-                jobs.append(_run_instagram(city, client, token))
+                jobs.append(_run_instagram(city, client, token, stories_dir))
             results = await asyncio.gather(*jobs)
     finally:
         collector_log.removeHandler(warnings)
@@ -206,7 +232,8 @@ def build_payload(
             "removed_by_content_filter": len(removed),
         },
         "content_filter_removed": removed,
-        "instagram_posts": instagram_posts or [],
+        "instagram_posts": [p for p in instagram_posts or [] if p.get("kind") != "story"],
+        "instagram_stories": [p for p in instagram_posts or [] if p.get("kind") == "story"],
     }
 
 
@@ -216,7 +243,8 @@ async def collect_payload(
     sources: Optional[Sequence[str]] = None,
     with_instagram: bool = True,
     max_per_day: int = 26,
+    stories_dir: Optional[str] = None,
 ) -> dict:
     now = (now or datetime.now(city.zone)).astimezone(city.zone)
-    events, statuses, posts, blocked = await collect_all(city, now, sources, with_instagram)
+    events, statuses, posts, blocked = await collect_all(city, now, sources, with_instagram, stories_dir=stories_dir)
     return build_payload(city, now, events, statuses, posts, blocked, max_per_day)

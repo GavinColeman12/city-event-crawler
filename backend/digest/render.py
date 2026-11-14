@@ -308,6 +308,18 @@ def brief_text(payload: dict, about_chars: int = 160, caption_chars: int = 400) 
             out.append("@%s · posted %s · %s · %s" % (post.get("handle"), str(post.get("posted_at"))[:10],
                                                       likes_text, post.get("url")))
             out.append("  %s" % _plain(post.get("caption"), caption_chars))
+    stories = payload.get("instagram_stories") or []
+    if stories:
+        out.append("")
+        out.append("===== INSTAGRAM STORIES — %d live stories (posted in the last 24h; the text is INSIDE the "
+                   "image, so open each image file and read it) =====" % len(stories))
+        for story in stories:
+            out.append("@%s · posted %s%s · %s" % (story.get("handle"), str(story.get("posted_at"))[:16].replace("T", " "),
+                                                   " · video (cover frame only)" if story.get("is_video") else "",
+                                                   story.get("url")))
+            out.append("  image: %s" % (story.get("image_path") or "not downloaded — %s" % story.get("image_url")))
+            if story.get("caption"):
+                out.append("  text: %s" % _plain(story.get("caption"), caption_chars))
     return "\n".join(out) + "\n"
 
 
@@ -357,7 +369,7 @@ def _coverage_line(payload: dict) -> str:
             continue    # a source that was never switched on is not news
         partial = " (partial)" if status.get("warnings") else ""
         if name == "instagram" and status.get("ok"):
-            counted.append("Instagram %d posts" % status.get("posts", 0))
+            counted.append("Instagram %d posts + %d stories%s" % (status.get("posts", 0), status.get("stories", 0), partial))
         elif status.get("ok") and status.get("events"):
             counted.append("%s %d%s" % (_label(name), status["events"], partial))
         else:

@@ -57,7 +57,7 @@ def _print_summary(payload: dict) -> None:
     for name, status in payload["sources"].items():
         if status.get("ok"):
             count = status.get("events", status.get("posts", 0))
-            unit = "posts" if name == "instagram" else "events"
+            unit = "posts + %d stories" % status.get("stories", 0) if name == "instagram" else "events"
             line = "  ok    %-11s %4d %s  (%.1fs)" % (name, count, unit, status["seconds"])
             for warning in status.get("warnings") or []:
                 line += "\n          ⚠ PARTIAL: %s" % warning
@@ -81,7 +81,8 @@ def _collect(args) -> dict:
     sources = [s.strip() for s in args.sources.split(",")] if args.sources else None
     return asyncio.run(engine.collect_payload(
         city, now=_parse_now(args.now, city), sources=sources,
-        with_instagram=not args.no_instagram, max_per_day=args.max_per_day))
+        with_instagram=not args.no_instagram, max_per_day=args.max_per_day,
+        stories_dir=os.path.splitext(args.out)[0] + "_stories"))
 
 
 def _nothing_collected(payload: dict) -> bool:

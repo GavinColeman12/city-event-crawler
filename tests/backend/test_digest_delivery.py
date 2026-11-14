@@ -277,6 +277,44 @@ async def test_instagram_is_skipped_without_a_token_and_filtered_with_one(monkey
     assert statuses["instagram"] == dict(statuses["instagram"], ok=True, posts=1)
 
 
+async def test_instagram_stories_ride_along_and_fail_separately(monkeypatch):
+    async def posts(city, client, token):
+        return [{"handle": "sala_apolo", "caption": "Nitsa this Friday", "url": "https://instagram.com/p/1"}]
+
+    async def stories(city, client, token):
+        return [{"kind": "story", "handle": "planesenbarcelona", "caption": "", "posted_at": "2026-11-12T08:00:00+00:00",
+                 "url": "https://www.instagram.com/stories/planesenbarcelona/1/", "image_url": "https://cdn.example/a.jpg"}]
+
+    async def broken(city, client, token):
+        raise CollectorError("Apify monthly usage limit reached (402)")
+
+    async def download(found, client, directory):
+        for story in found:
+            story["image_path"] = directory + "/01.jpg"
+        return len(found)
+
+    monkeypatch.setattr(engine, "REGISTRY", ())
+    env = {engine.APIFY_TOKEN_ENV: "tok"}
+    _fake_sources(monkeypatch, {"instagram": SimpleNamespace(
+        collect_posts=posts, collect_stories=stories, download_story_images=download)})
+    events, statuses, found, denied = await engine.collect_all(CITY, NOW, env=env, stories_dir="/tmp/x")
+    assert statuses["instagram"]["posts"] == 1 and statuses["instagram"]["stories"] == 1
+    payload = engine.build_payload(CITY, NOW, events, statuses, found, denied)
+    assert len(payload["instagram_posts"]) == 1 and payload["instagram_stories"][0]["image_path"] == "/tmp/x/01.jpg"
+    brief = render.brief_text(payload)
+    assert "INSTAGRAM STORIES — 1 live" in brief and "image: /tmp/x/01.jpg" in brief
+    assert "Instagram 1 posts + 1 stories" in render.render_message(payload, {"today": [], "tomorrow": []})
+
+    _fake_sources(monkeypatch, {"instagram": SimpleNamespace(collect_posts=posts, collect_stories=broken)})
+    _, statuses, found, _ = await engine.collect_all(CITY, NOW, env=env)
+    assert statuses["instagram"]["ok"] and len(found) == 1
+    assert statuses["instagram"]["warnings"] == ["stories: Apify monthly usage limit reached (402)"]
+
+    _fake_sources(monkeypatch, {"instagram": SimpleNamespace(collect_posts=broken, collect_stories=broken)})
+    _, statuses, found, _ = await engine.collect_all(CITY, NOW, env=env)
+    assert not statuses["instagram"]["ok"] and found == [] and "posts: Apify" in statuses["instagram"]["error"]
+
+
 # ───────────── command line ─────────────
 
 @pytest.fixture

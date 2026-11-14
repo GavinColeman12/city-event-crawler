@@ -31,7 +31,7 @@ collect  →  pick  →  render  →  send
 | Xceed | `collectors/xceed.py` | Xceed popularity rank, venue followers |
 | Eventbrite | `collectors/eventbrite.py` | organiser followers, "going fast" / "few tickets left" |
 | Luma | `collectors/luma.py` | guests, spots remaining |
-| Instagram (optional) | `collectors/instagram.py` | likes / comments per post — needs `INSTAGRAM_APIFY_TOKEN` and a working Apify account |
+| Instagram (optional) | `collectors/instagram.py` | likes / comments per post, plus each account's live stories (images saved next to the candidates file) — needs `INSTAGRAM_APIFY_TOKEN` and a working Apify account |
 
 All of these are the sites' own public endpoints, called without login. They are
 undocumented and will change; each collector raises `CollectorError` when its
@@ -77,7 +77,8 @@ environment needs:
 - **Network access → Allowed domains**: `www.meetup.com`, `ra.co`, `dice.fm`,
   `*.xceed.me`, `www.eventbrite.com`, `api.lu.ma`, `lu.ma`, `luma.com`,
   the WhatsApp provider's host (`api.callmebot.com` or `api.textmebot.com`), and
-  `api.apify.com` if Instagram is on.
+  `api.apify.com` if Instagram is on. Story images are downloaded from Instagram's
+  image servers, so also allow `*.cdninstagram.com` and `*.fbcdn.net`.
 - **Environment variables**: the `WHATSAPP_*` values above.
 
 ## Tests
