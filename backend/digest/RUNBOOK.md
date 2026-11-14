@@ -31,6 +31,11 @@ Everything runs from the repository root with `python3`. The only dependency is
    requests through to each site ("open") or blocks them. It never prints
    secrets. Keep the output for your final report; carry on whatever it says.
 
+   If `check` says Instagram is not configured but the task prompt that started
+   this run gives an Apify token (a value starting `apify_api_`), put it in the
+   environment for the commands below — `export INSTAGRAM_APIFY_TOKEN=<that value>`
+   in the same shell command as `collect` — and never print or repeat it.
+
 2. **Collect**
 
    ```
