@@ -187,6 +187,8 @@ async def collect_all(
     posts: List[dict] = []
     if run_instagram:
         posts, statuses["instagram"] = results[-1]
+        statuses["instagram"]["warnings"] = (warnings.by_source.get("instagram", [])
+                                             + statuses["instagram"].get("warnings", []))
     elif with_instagram:
         statuses["instagram"] = {"ok": False, "posts": 0, "seconds": 0.0, "skipped": True,
                                  "error": "not configured (%s is not set)" % APIFY_TOKEN_ENV}

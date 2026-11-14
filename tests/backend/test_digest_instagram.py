@@ -112,15 +112,15 @@ def test_barcelona_handles_clean():
 
 
 # ───────────── stories ─────────────
-# SYNTHETIC rows: the stories actor (muhammetakkurtt/instagram-scraper) could not
-# be run live, so these use the field names the repo already reads from it plus
-# Instagram's raw API names.
+# Hand-built rows in the two shapes parse_stories accepts: camelCase, and the raw
+# Instagram API names the stories actor returned in a live run on 2026-11-14.
 
 STORY_ITEMS = [
     {"username": "PlanesEnBarcelona", "id": "111_999", "timestamp": "2026-11-12T08:00:00Z",
      "displayUrl": "https://cdn.example/a.jpg", "caption": "Mercat de Nadal avui 18h"},
     {"user": {"username": "barcelonasecreta"}, "pk": "222", "taken_at": 1794470400,   # 2026-11-12 08:00 UTC
-     "image_versions2": {"candidates": [{"url": "https://cdn.example/b.jpg"}]}, "video_versions": [{"url": "x"}]},
+     "image_versions2": {"candidates": [{"url": "https://cdn.example/b.jpg"}]}, "video_versions": [{"url": "x"}],
+     "story_link_stickers": [{"story_link": {"url": "https://l.instagram.com/?u=https%3A%2F%2Fexample.com%2Fplan%3Futm%3D1&e=x"}}]},
     {"username": "sala_apolo", "id": "333", "timestamp": "2026-11-09T08:00:00Z", "displayUrl": "https://cdn.example/old.jpg"},
     {"username": "sala_apolo", "id": "444", "displayUrl": "https://cdn.example/undated.jpg"},
     {"username": "sala_apolo", "id": "555"},                                      # no image
@@ -136,6 +136,7 @@ def test_parse_stories():
     by = {s["handle"]: s for s in stories}
     assert by["planesenbarcelona"]["url"] == "https://www.instagram.com/stories/planesenbarcelona/111/"
     assert by["planesenbarcelona"]["caption"] == "Mercat de Nadal avui 18h"
+    assert by["barcelonasecreta"]["caption"] == "link: https://example.com/plan"
     assert by["barcelonasecreta"]["is_video"] is True and by["barcelonasecreta"]["image_url"].endswith("b.jpg")
     assert by["sala_apolo"]["image_url"].endswith("undated.jpg")       # expired one dropped, undated kept
 
@@ -151,7 +152,10 @@ def test_collect_stories_and_download(tmp_path):
     def handler(request):
         if request.url.host == "api.apify.com":
             seen["url"] = str(request.url)
-            seen["body"] = json.loads(request.content)
+            body = json.loads(request.content)
+            seen.setdefault("bodies", []).append(body)
+            if body["usernames"] == ["crashes"]:
+                return httpx.Response(400, json={"error": {"type": "run-failed", "message": "Actor run did not succeed"}})
             return httpx.Response(201, json=STORY_ITEMS)
         if request.url.path.endswith("b.jpg"):
             return httpx.Response(403)
@@ -159,12 +163,24 @@ def test_collect_stories_and_download(tmp_path):
 
     async def run():
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            stories = await ig.collect_stories("barcelona", client, "tok", handles=["@PlanesEnBarcelona"])
+            stories = await ig.collect_stories("barcelona", client, "tok", handles=["@PlanesEnBarcelona", "crashes"])
             saved = await ig.download_story_images(stories, client, str(tmp_path / "stories"))
             return stories, saved
     stories, saved = asyncio.run(run())
     assert "muhammetakkurtt~instagram-scraper" in seen["url"] and "tok" not in seen["url"]
-    assert seen["body"] == {"usernames": ["planesenbarcelona"], "resultsType": "stories"}
+    assert seen["bodies"] == [{"usernames": ["planesenbarcelona"], "resultsType": "stories"},
+                              {"usernames": ["crashes"], "resultsType": "stories"}]     # one run per handle
     assert saved == 2
     paths = [s.get("image_path") for s in stories]
     assert sum(p is not None for p in paths) == 2 and all(Path(p).read_bytes() for p in paths if p)
+
+
+def test_collect_stories_raises_when_every_handle_fails():
+    def handler(request):
+        return httpx.Response(402, json={"error": {"type": "payment-required", "message": "x"}})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            await ig.collect_stories("barcelona", client, "tok", handles=["a", "b"])
+    with pytest.raises(CollectorError, match="usage limit"):
+        asyncio.run(run())

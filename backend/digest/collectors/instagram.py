@@ -45,9 +45,11 @@ the ranking step can look at them::
     {"kind": "story", "handle", "url", "caption", "posted_at", "likes": None,
      "comments": None, "is_video", "image_url", "image_path" (after download)}
 
-The story row shape was not verified against a live run (no token was
-available when this was written), so ``parse_stories`` accepts the field names
-used by this actor's rows elsewhere in the repo plus Instagram's raw API names.
+Live rows (checked 2026-11-14) use Instagram's raw API names: ``pk``,
+``taken_at`` (epoch), ``user.username``, ``image_versions2.candidates``,
+``video_versions``, ``story_link_stickers``.  ``parse_stories`` also accepts
+the camelCase names other Apify actors use.  The actor is run once per handle
+(see ``collect_stories``); on the FREE tier each run costs a $0.01 start fee.
 
 Failures raise ``CollectorError`` with a short reason (no token, 401 bad token,
 402 / "usage limit" account cap, 403 blocked account (e.g. unpaid invoices), actor timeout, other HTTP errors).  The
@@ -57,12 +59,15 @@ Python 3.9 compatible; stdlib + httpx only.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
 import sys
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional
+
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 
@@ -80,6 +85,7 @@ USD_PER_POST = 0.0023             # FREE-tier price; see module docstring
 STORIES_ACTOR = "muhammetakkurtt/instagram-scraper"
 STORIES_RUN_URL = "https://api.apify.com/v2/acts/muhammetakkurtt~instagram-scraper/run-sync-get-dataset-items"
 MAX_STORIES_PER_ACCOUNT = 5
+STORIES_CONCURRENCY = 3
 STORY_MAX_AGE_HOURS = 30          # stories live 24h; a little slack for clock skew
 MAX_STORY_IMAGE_BYTES = 4_000_000
 
@@ -301,6 +307,11 @@ def _story_text(item: Dict[str, Any]) -> str:
     if isinstance(caption, dict):
         caption = caption.get("text")
     parts = [caption, item.get("text"), item.get("accessibilityCaption") or item.get("accessibility_caption")]
+    for sticker in item.get("story_link_stickers") or []:
+        link = ((sticker or {}).get("story_link") or {}).get("url") if isinstance(sticker, dict) else None
+        if isinstance(link, str) and link:
+            target = parse_qs(urlparse(link).query).get("u", [link])[0]     # unwrap l.instagram.com redirects
+            parts.append("link: %s" % target.split("?")[0])
     for mention in item.get("mentions") or []:
         if isinstance(mention, str):
             parts.append("@" + mention.lstrip("@"))
@@ -378,7 +389,31 @@ async def collect_stories(
     handles = _resolve_handles(city, handles)
     if not handles:
         return []
-    items = await _run_actor(client, STORIES_RUN_URL, {"usernames": handles, "resultsType": "stories"}, token)
+    # One actor run per handle: the actor's free tier takes at most three
+    # usernames per run, and (seen live) one account crashing the actor fails
+    # the whole run.  Each run costs one actor-start fee.
+    # Apify's free plan allows five concurrent runs; the posts run is one of them.
+    gate = asyncio.Semaphore(STORIES_CONCURRENCY)
+
+    async def one(handle: str) -> List[Any]:
+        async with gate:
+            return await _run_actor(client, STORIES_RUN_URL, {"usernames": [handle], "resultsType": "stories"}, token)
+
+    results = await asyncio.gather(*[one(h) for h in handles], return_exceptions=True)
+    items: List[Any] = []
+    failed: List[str] = []
+    for handle, result in zip(handles, results):
+        if isinstance(result, CollectorError):
+            failed.append(handle)
+            last_error = result
+        elif isinstance(result, BaseException):
+            raise result
+        else:
+            items.extend(result)
+    if failed and len(failed) == len(handles):
+        raise last_error
+    if failed:
+        logger.warning("instagram: stories unavailable for %s", ", ".join("@" + h for h in failed))
     stories = parse_stories(items, datetime.now(timezone.utc), per_account)
     logger.info("instagram: %d items -> %d live stories from %d handles", len(items), len(stories), len(handles))
     return stories
