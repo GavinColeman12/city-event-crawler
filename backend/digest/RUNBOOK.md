@@ -62,6 +62,12 @@ Everything runs from the repository root with `python3`. The only dependency is
    a listings page will do). If sources disagree on date or venue, mention it in
    `note` instead of listing it. Only skip this step if you have no search tool.
 
+   One of those searches must be for **tardeos** (afternoon/evening club
+   sessions, roughly 17:00 to midnight) today and tomorrow: Tardet or Tardetazo at
+   Sutton, and tardeos at other clubs (Bling Bling, Opium, Luz de Gas). Promoter
+   sites such as YouBarcelona and Fever list them; the event sources above do
+   not. Gavin goes to these, so a confirmed tardeo is a strong pick.
+
 4. **Pick up to five for today and up to five for tomorrow**
 
    How to judge:
