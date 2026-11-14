@@ -251,7 +251,8 @@ def _status_line(payload: dict) -> str:
     return " · ".join(parts)
 
 
-def brief_text(payload: dict, about_chars: int = 160, caption_chars: int = 400) -> str:
+def brief_text(payload: dict, about_chars: int = 160, caption_chars: int = 400,
+               guide_caption_chars: int = 2500) -> str:
     """The shortlist as compact text for the ranker — the same facts the message will print."""
     zone = ZoneInfo(payload["city"]["tz"])
     now = datetime.fromisoformat(payload["generated_at"]).astimezone(zone)
@@ -298,23 +299,25 @@ def brief_text(payload: dict, about_chars: int = 160, caption_chars: int = 400) 
                 out.append("  about: %s" % _plain(c["description"], about_chars))
 
     posts = payload.get("instagram_posts") or []
+    # City-guide posts first and in full: what they feature is to be prioritised.
+    posts = [p for p in posts if p.get("guide")] + [p for p in posts if not p.get("guide")]
     if posts:
         out.append("")
         out.append("===== INSTAGRAM — %d recent posts from Barcelona event accounts (unstructured: read for "
-                   "events happening today or tomorrow) =====" % len(posts))
+                   "events happening today or tomorrow; CITY GUIDE posts are priority finds) =====" % len(posts))
         for post in posts:
             likes = post.get("likes")
             likes_text = "%s likes" % _num(likes) if _is_count(likes) else "likes hidden"
-            out.append("@%s · posted %s · %s · %s" % (post.get("handle"), str(post.get("posted_at"))[:10],
-                                                      likes_text, post.get("url")))
-            out.append("  %s" % _plain(post.get("caption"), caption_chars))
+            out.append("%s@%s · posted %s · %s · %s" % ("CITY GUIDE " if post.get("guide") else "", post.get("handle"),
+                                                        str(post.get("posted_at"))[:10], likes_text, post.get("url")))
+            out.append("  %s" % _plain(post.get("caption"), guide_caption_chars if post.get("guide") else caption_chars))
     stories = payload.get("instagram_stories") or []
     if stories:
         out.append("")
         out.append("===== INSTAGRAM STORIES — %d live stories (posted in the last 24h; the text is INSIDE the "
                    "image, so open each image file and read it) =====" % len(stories))
         for story in stories:
-            out.append("@%s · posted %s%s · %s" % (story.get("handle"), str(story.get("posted_at"))[:16].replace("T", " "),
+            out.append("%s@%s · posted %s%s · %s" % ("CITY GUIDE " if story.get("guide") else "", story.get("handle"), str(story.get("posted_at"))[:16].replace("T", " "),
                                                    " · video (cover frame only)" if story.get("is_video") else "",
                                                    story.get("url")))
             out.append("  image: %s" % (story.get("image_path") or "not downloaded — %s" % story.get("image_url")))

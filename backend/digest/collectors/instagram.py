@@ -104,6 +104,13 @@ CITY_HANDLES: Dict[str, List[str]] = {
     ],
 }
 
+# City-guide accounts: they do not run events, they pick the best things on in
+# the city (street fairs, markets, festivals).  Gavin asked for what they feature
+# to be prioritised, so the brief shows their posts first and in full.
+GUIDE_HANDLES: Dict[str, List[str]] = {
+    "barcelona": ["planesenbarcelona", "barcelonasecreta"],
+}
+
 # NOT used by default.  Each is linked from the organisation's own website
 # (exact spelling seen there) but has only that one source and no confirmed
 # recent activity.  Promote to CITY_HANDLES after a successful live run shows
@@ -415,6 +422,9 @@ async def collect_stories(
     if failed:
         logger.warning("instagram: stories unavailable for %s", ", ".join("@" + h for h in failed))
     stories = parse_stories(items, datetime.now(timezone.utc), per_account)
+    guides = set(GUIDE_HANDLES.get(getattr(city, "key", city), []))
+    for story in stories:
+        story["guide"] = story["handle"] in guides
     logger.info("instagram: %d items -> %d live stories from %d handles", len(items), len(stories), len(handles))
     return stories
 
@@ -453,7 +463,7 @@ async def collect_posts(
     client: httpx.AsyncClient,
     token: str,
     handles: Optional[List[str]] = None,
-    per_account: int = 3,
+    per_account: int = 6,
     max_age_days: int = 5,
 ) -> List[dict]:
     """Run the posts actor once for all ``handles`` and return parsed posts."""
@@ -472,6 +482,9 @@ async def collect_posts(
     }
     items = await _run_actor(client, APIFY_RUN_URL, run_input, token)
     posts = parse_posts(items, now, max_age_days)
+    guides = set(GUIDE_HANDLES.get(getattr(city, "key", city), []))
+    for post in posts:
+        post["guide"] = post["handle"] in guides
     logger.info("instagram: %d items -> %d recent posts from %d handles", len(items), len(posts), len(handles))
     return posts
 

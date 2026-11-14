@@ -68,6 +68,17 @@ Everything runs from the repository root with `python3`. The only dependency is
      a big meetup, 500 interested is a packed club night, an arena show beats both.
      Language and audience do not matter — a Catalan-language event with a huge
      crowd outranks a small English-speaking one.
+   - **City-guide finds come first.** Gavin asked for this explicitly: when
+     @planesenbarcelona or @barcelonasecreta (marked CITY GUIDE in the brief)
+     feature something happening today or tomorrow — a street wine fair, a
+     market, a neighbourhood festival, a food festival, a free open-air event —
+     treat it as a top candidate and aim to give these one or two of each day's
+     five slots, ahead of an ordinary club night or meetup. Their weekend
+     round-up posts list several at once; go through every item. The post's
+     likes and what the story shows (a packed street) are the popularity signal.
+     If the post gives the date and place but not the hours, do one web search
+     to pin them down; if you still can't, list it with `when` as the day and
+     "hours not stated" instead of dropping it.
    - **Still things worth an evening:** concerts, club nights, festivals, matches,
      big socials. Not: kids' events, courses, sales seminars, religious or support
      groups, anything online.
@@ -123,8 +134,9 @@ Everything runs from the repository root with `python3`. The only dependency is
      and links are filled in from the collected data, so never retype them.
 
    If the brief has an INSTAGRAM section, skim the captions for events happening
-   today or tomorrow that are not already candidates. Use one only when the caption
-   itself states the date, time and place.
+   today or tomorrow that are not already candidates. For ordinary accounts, use one
+   only when the caption itself states the date, time and place; for CITY GUIDE
+   posts, follow the city-guide rule in step 4.
 
    If the brief has an INSTAGRAM STORIES section, look at every story: open each
    `image:` file with your file reader (stories put their text inside the picture,
