@@ -14,6 +14,8 @@ speaks English, and goes out with an international crowd.
 
 What he asked for: the **most popular** events in the city, whoever they are
 for — locals or visitors — with *the stats* for each, and *no kinky parties*.
+He also wants anything with a largely **Argentine** crowd pushed towards the top
+(see step 4).
 
 ## The job
 
@@ -62,6 +64,11 @@ Everything runs from the repository root with `python3`. The only dependency is
    a listings page will do). If sources disagree on date or venue, mention it in
    `note` instead of listing it. Only skip this step if you have no search tool.
 
+   One of those searches must be for **Argentine events** today and tomorrow:
+   concerts by Argentine artists (rock nacional, trap, cumbia, cuarteto), Argentine
+   club nights such as Bresh, peñas, tango milongas with a young crowd, and
+   Argentina or Boca/River match screenings in Argentine bars.
+
    One of those searches must be for **tardeos** (afternoon/evening club
    sessions, roughly 17:00 to midnight) today and tomorrow: Tardet or Tardetazo at
    Sutton, and tardeos at other clubs (Bling Bling, Opium, Luz de Gas). Promoter
@@ -79,6 +86,20 @@ Everything runs from the repository root with `python3`. The only dependency is
      a big meetup, 500 interested is a packed club night, an arena show beats both.
      Language and audience do not matter — a Catalan-language event with a huge
      crowd outranks a small English-speaking one.
+   - **Argentine crowd: a big boost.** Gavin asked for this explicitly. An event
+     whose crowd will be largely Argentine — a concert by an Argentine artist, an
+     Argentine party brand (Bresh), a peña, an Argentina match screening, an
+     Argentine community social — ranks well above what its headcount alone
+     would earn: put a real one in the top two of its day, ahead of a bigger
+     ordinary club night or meetup. The brief marks keyword matches as
+     "Argentine crowd" under `looks like`; that is a hint, so check it is real
+     (a tango class for tourists is not an Argentine crowd) and look for ones it
+     missed, since listings rarely state an artist's nationality. Say in the
+     `why` that the crowd is Argentine. This does not replace popularity for
+     everything else: Argentines are one of the largest foreign communities in
+     Barcelona, so any very big general event (a street wine fair, a major
+     festival) will have plenty of them anyway and needs no extra argument.
+     The "never" rules below still apply.
    - **City-guide finds come first.** Gavin asked for this explicitly: when
      a city-guide account (@planesenbarcelona, @barcelonasecreta, @whatsonbcn,
      @ordatwins — marked CITY GUIDE in the brief)

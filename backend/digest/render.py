@@ -236,7 +236,7 @@ def auto_picks(payload: dict, per_day: int = MAX_PICKS_PER_DAY) -> dict:
 
 # The heuristic's keyword groups (candidates._BOOSTS), surfaced as a rough "type"
 # so the ranker can balance a day's list without re-deriving it from each blurb.
-_KIND_SIGNALS = ("international crowd", "social", "nightlife / music", "founders / tech", "active / outdoors")
+_KIND_SIGNALS = ("Argentine crowd", "international crowd", "social", "nightlife / music", "founders / tech", "active / outdoors")
 
 def _status_line(payload: dict) -> str:
     parts = []

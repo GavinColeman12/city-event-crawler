@@ -204,6 +204,19 @@ def test_a_500_person_club_night_outranks_a_tiny_keyword_rich_meetup():
     assert club.score > tiny.score
 
 
+def test_argentine_events_get_a_large_boost_beyond_the_keyword_cap():
+    plain = _scored(source="dice", title="Indie night", lineup=["Some Band"])
+    by_word = _scored(source="dice", title="Fiesta argentina: cumbia y fernet")
+    by_artist = _scored(source="dice", title="Indie night", lineup=["Bándalos Chinos"])
+    assert by_word.score >= plain.score + 20 and "Argentine crowd" in by_word.signals
+    assert by_artist.score >= plain.score + 20 and "Argentine crowd" in by_artist.signals
+    assert "Argentine crowd" not in plain.signals
+    # a small Argentine event outranks a clearly bigger ordinary one
+    small = _scored(title="Peña argentina", attending=15, attending_label="going")
+    bigger = _scored(title="Book club", attending=40, attending_label="going")
+    assert small.score > bigger.score
+
+
 def test_sold_out_costs_points_and_says_so():
     open_ = _scored(title="Spanish conversation", attending=17, attending_label="going", capacity=30)
     full = _scored(title="Spanish conversation", attending=17, attending_label="going", capacity=17, sold_out=True)

@@ -288,6 +288,25 @@ _BOOSTS = (
 )
 _BOOST_CAP = 14
 
+# Gavin's standing preference: events with a largely Argentine crowd rank well
+# above their headcount. Scored on its own, outside _BOOST_CAP, so it moves an
+# event up the list instead of being absorbed by the other keyword groups.
+# Artist names are here because a concert listing rarely states a nationality;
+# names that are also everyday words (Emilia, Trueno, Airbag) are left out.
+_ARGENTINE_POINTS = 22
+_ARGENTINE = (
+    r"argentin(?:a|as|o|os|e|ian|ians)|buenos aires|porten[oa]s?|rioplatense|patagonia"
+    r"|asado argentino|fernet|malbec|milonga|folklore argentino|chacarera|cuarteto cordobes"
+    r"|rock nacional|cumbia (?:villera|420)|rkt|bresh|fiesta bresh|boca juniors|river plate|la scaloneta"
+    r"|duki|bizarrap|nicki nicole|maria becerra|lali esposito|paulo londra|ysy a|khea|cazzu|tiago pzk"
+    r"|lit killah|milo j|luck ra|la k.?onga|ke personajes|callejero fino|la joaqui|rusherking|fmk"
+    r"|dillom|ca7riel|paco amoroso|nathy peluso|bandalos chinos|conociendo rusia|el kuelgue"
+    r"|el mato a un policia motorizado|babasonicos|fabulosos cadillacs|autenticos decadentes"
+    r"|fito paez|calamaro|charly garcia|soda stereo|cerati|spinetta|la renga|los piojos"
+    r"|las pastillas del abuelo|catupecu machu|la beriso|abel pintos|los palmeras|hernan cattaneo"
+)
+_ARGENTINE = re.compile(r"\b(?:%s)\b" % _ARGENTINE)
+
 # Penalties look at the title and tags only — descriptions mention "online
 # tickets" or "kids welcome" far too casually to be evidence.
 _PENALTIES = (
@@ -378,13 +397,17 @@ def score(candidate: Candidate) -> None:
         signals.append("listing in English")   # informational only: ranking is by popularity
 
     # 3. What kind of event it is.
-    body = fold(" ".join(filter(None, [ev.title, ev.description, ev.organizer, " ".join(str(t) for t in ev.tags)])))
+    body = fold(" ".join(filter(None, [ev.title, ev.description, ev.organizer, " ".join(str(t) for t in ev.tags),
+                                       " ".join(str(a) for a in ev.lineup)])))
     boost = 0
     for name, pts, pattern in _BOOSTS:
         if pattern.search(body):
             boost += pts
             signals.append(name)
     total += min(boost, _BOOST_CAP)
+    if _ARGENTINE.search(body):
+        total += _ARGENTINE_POINTS
+        signals.append("Argentine crowd")
 
     headline = fold(" ".join([ev.title, " ".join(str(t) for t in ev.tags)]))
     for name, pts, pattern in _PENALTIES:
