@@ -91,6 +91,13 @@ Everything runs from the repository root with `python3`. The only dependency is
      If the post gives the date and place but not the hours, do one web search
      to pin them down; if you still can't, list it with `when` as the day and
      "hours not stated" instead of dropping it.
+   - **Language exchanges go last.** Gavin has been to them and did not like
+     them: the groups were uncomfortably small and the crowd was odd. This covers
+     anything whose format is a language exchange or intercambio, including the
+     "Language Exchange & Party" / Barcelona International Social nights that
+     bolt on board games, salsa or free club entry. Do not pick one while any
+     other reasonable event is available, however high its headcount or score;
+     a shorter list is better than one padded with a language exchange.
    - **Still things worth an evening:** concerts, club nights, festivals, matches,
      big socials. Not: kids' events, courses, sales seminars, religious or support
      groups, anything online.
@@ -132,9 +139,17 @@ Everything runs from the repository root with `python3`. The only dependency is
    }
    ```
 
-   - `why`: one sentence, at most 170 characters. Say what it is and why it suits
-     him (the crowd, the scale, what is special about this edition). Do not repeat
-     the numbers — the stats line is printed for you. Plain words, no hype.
+   - `why`: one or two sentences, at most 240 characters. Say what it is and why
+     it suits him (the crowd, the scale, what is special about this edition). Do
+     not repeat the numbers — the stats line is printed for you. Plain words, no hype.
+   - **Say the vibe when the title does not.** For open-format events — tapas
+     routes, fairs, markets, neighbourhood festivals, street parties, anything
+     without a stage or a host — Gavin cannot tell from the name what the evening
+     is like. The `why` must say what you actually do there and which kind of
+     night it is: somewhere to go with friends you already have, or somewhere you
+     meet new people. Add what you know about how busy it gets and who goes. If
+     the listing does not make this clear, do one web search or open the event's
+     page to find out; if you still cannot tell, say so plainly rather than guess.
    - `note`: only for something that changes his plans and that you learned in
      this run — a public holiday, a big match emptying or filling the city, a
      marquee concert you could not verify well enough to list. Leave it out

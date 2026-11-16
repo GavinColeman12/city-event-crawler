@@ -30,7 +30,7 @@ from backend.digest.cities import NIGHT_ROLLOVER_HOUR
 from backend.digest.guardrails import blocked_term
 
 MAX_PICKS_PER_DAY = 5
-MAX_WHY_CHARS = 170
+MAX_WHY_CHARS = 240
 MAX_TITLE_CHARS = 80
 
 SOURCE_LABEL = {
