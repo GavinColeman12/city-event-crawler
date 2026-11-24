@@ -299,12 +299,12 @@ def brief_text(payload: dict, about_chars: int = 160, caption_chars: int = 400,
                 out.append("  about: %s" % _plain(c["description"], about_chars))
 
     posts = payload.get("instagram_posts") or []
-    # City-guide posts first and in full: what they feature is to be prioritised.
+    # City-guide posts first and in full: their round-ups list several events each.
     posts = [p for p in posts if p.get("guide")] + [p for p in posts if not p.get("guide")]
     if posts:
         out.append("")
         out.append("===== INSTAGRAM — %d recent posts from Barcelona event accounts (unstructured: read for "
-                   "events happening today or tomorrow; CITY GUIDE posts are priority finds) =====" % len(posts))
+                   "events happening today or tomorrow; from CITY GUIDE posts take organised events, not markets) =====" % len(posts))
         for post in posts:
             likes = post.get("likes")
             likes_text = "%s likes" % _num(likes) if _is_count(likes) else "likes hidden"

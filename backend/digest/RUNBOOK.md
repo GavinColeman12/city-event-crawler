@@ -58,7 +58,8 @@ Everything runs from the repository root with `python3`. The only dependency is
    events that draw the biggest crowds. Search for today and tomorrow: arena and
    stadium concerts (Palau Sant Jordi, Sant Jordi Club, Estadi Olímpic,
    Razzmatazz, Apolo), FC Barcelona and Espanyol home matches, festivals, fairs,
-   city celebrations and public holidays. Add each one you can pin down — a
+   city celebrations and public holidays. Look for organised events with a
+   line-up or a host, not markets or things to wander round. Add each one you can pin down — a
    specific event with a date and venue your sources agree on — as a `custom`
    pick candidate, with the best link you found (artist, venue or ticket seller;
    a listings page will do). If sources disagree on date or venue, mention it in
@@ -100,18 +101,34 @@ Everything runs from the repository root with `python3`. The only dependency is
      Barcelona, so any very big general event (a street wine fair, a major
      festival) will have plenty of them anyway and needs no extra argument.
      The "never" rules below still apply.
-   - **City-guide finds come first.** Gavin asked for this explicitly: when
-     a city-guide account (@planesenbarcelona, @barcelonasecreta, @whatsonbcn,
-     @ordatwins — marked CITY GUIDE in the brief)
-     features something happening today or tomorrow — a street wine fair, a
-     market, a neighbourhood festival, a food festival, a free open-air event —
-     treat it as a top candidate and aim to give these one or two of each day's
-     five slots, ahead of an ordinary club night or meetup. Their weekend
-     round-up posts list several at once; go through every item. The post's
-     likes and what the story shows (a packed street) are the popularity signal.
-     If the post gives the date and place but not the hours, do one web search
-     to pin them down; if you still can't, list it with `when` as the day and
-     "hours not stated" instead of dropping it.
+   - **Organised events first; markets and wander-arounds last.** Gavin asked
+     for this explicitly after a week of digests led by a Christmas market, a
+     tapas route and a light display: he wants *organised* events, not "random
+     markets". An organised event has a host or a line-up, a start time and a
+     reason for a crowd to be in one room together: a concert, a club night, a
+     tardeo, a match, a ticketed festival with a programme, a hosted social,
+     founders' drinks, a comedy night, a run club. Fill the day's slots with
+     those.
+     An open-format plan — a market, a Christmas fair, a tapas route, a light
+     display or videomapping, a shopping street event, an exhibition, anything
+     you simply walk around at whenever you like — is **not a pick** by default,
+     however many likes a city guide's post about it has. Allow at most **one
+     per day**, never in the top two, and only when it is a genuine one-off
+     happening on that day (a switch-on ceremony with a stage, the main night
+     of a neighbourhood festa major, a street wine fair that runs one weekend).
+     Something that is open every day for weeks (a Christmas market, a
+     month-long tapas route, a light trail) is never a pick; if it has just
+     opened, one clause in `note` is enough, once, and not again on later days.
+     The city-guide accounts (@planesenbarcelona, @barcelonasecreta,
+     @whatsonbcn, @ordatwins — marked CITY GUIDE in the brief) are still worth
+     reading, but for the organised things they feature: a festival with a
+     line-up, a concert, a one-night party, a ticketed food-and-music event.
+     Their round-up posts list several items; go through every one and keep
+     only those that pass this test. If such a post gives the date and place
+     but not the hours, do one web search to pin them down; an organised event
+     whose hours you cannot find is not a pick.
+     A shorter list of organised events is better than five padded with a
+     market.
    - **Language exchanges go last.** Gavin has been to them and did not like
      them: the groups were uncomfortably small and the crowd was odd. This covers
      anything whose format is a language exchange or intercambio, including the
@@ -191,7 +208,8 @@ Everything runs from the repository root with `python3`. The only dependency is
    - **Say the vibe when the title does not.** For open-format events — tapas
      routes, fairs, markets, neighbourhood festivals, street parties, anything
      without a stage or a host — Gavin cannot tell from the name what the evening
-     is like. The `why` must say what you actually do there and which kind of
+     is like (you will rarely pick one; see the organised-events rule in step
+     4). The `why` must say what you actually do there and which kind of
      night it is: somewhere to go with friends you already have, or somewhere you
      meet new people. Add what you know about how busy it gets and who goes. If
      the listing does not make this clear, do one web search or open the event's
@@ -209,7 +227,7 @@ Everything runs from the repository root with `python3`. The only dependency is
    If the brief has an INSTAGRAM section, skim the captions for events happening
    today or tomorrow that are not already candidates. For ordinary accounts, use one
    only when the caption itself states the date, time and place; for CITY GUIDE
-   posts, follow the city-guide rule in step 4.
+   posts, follow the organised-events rule in step 4.
 
    If the brief has an INSTAGRAM STORIES section, look at every story: open each
    `image:` file with your file reader (stories put their text inside the picture,
